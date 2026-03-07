@@ -1,0 +1,126 @@
+# Nota: Eliminamos 'version' porque ya es obsoleta en Docker Compose V2
+services:
+  # --- INFRAESTRUCTURA DE DATOS ---
+  
+  catalog-db:
+    image: postgres:15-alpine
+    container_name: urbano-catalog-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: catalog_db
+    ports:
+      - "5432:5432"
+
+  users-db:
+    image: postgres:15-alpine
+    container_name: users-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: users_prod
+    ports:
+      - "5434:5432"
+
+  orders-db:
+    image: postgres:15-alpine
+    container_name: urbano-orders-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: orders_db
+    ports:
+      - "5433:5432"
+
+  event-bus:
+    image: rabbitmq:3-management-alpine
+    container_name: urbano-event-bus
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  # --- MICROSERVICIOS ---
+
+  catalog-service:
+    build:
+      context: .
+      dockerfile: apps/catalog-service/Dockerfile
+    container_name: catalog-service
+    depends_on:
+      - catalog-db
+      - event-bus
+    environment:
+      DATABASE_URL: postgres://user:password@catalog-db:5432/catalog_db
+      EVENT_BUS_URL: amqp://event-bus:5672
+    ports:
+      - "3001:3000"
+
+  users-service:
+    build:
+      context: .
+      dockerfile: apps/users-service/Dockerfile
+    container_name: users-service
+    depends_on:
+      - users-db
+    environment:
+      DATABASE_URL: postgres://user:password@users-db:5432/users_prod
+      JWT_SECRET: ${JWT_SECRET:-super_secret_key_123} 
+    ports:
+      - "3002:3000"
+
+  auth-service: # Alineado correctamente con los otros servicios
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: auth-service
+    environment:
+      - PORT=3003
+      - JWT_SECRET=super-secret-key-123
+      - USERS_SERVICE_URL=http://users-service:3000 # Puerto interno del contenedor
+    ports:
+      - "3003:3003"
+    depends_on:
+      - users-service
+
+  inventory-db:
+    image: postgres:15-alpine
+    container_name: urbano-inventory-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: inventory_db
+    ports:
+      - "5435:5432" # Siguiente puerto disponible
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: apps/inventory-service/Dockerfile
+    container_name: inventory-service
+    depends_on:
+      - inventory-db
+      - event-bus
+    environment:
+      DATABASE_URL: postgres://user:password@inventory-db:5432/inventory_db
+      EVENT_BUS_URL: amqp://event-bus:5672
+      PORT: 3004
+    ports:
+      - "3004:3004"
+
+
+      # ... (resto de servicios igual)
+
+  order-service:
+    build:
+      context: .
+      dockerfile: apps/order-service/Dockerfile
+    container_name: order-service
+    depends_on:
+      - orders-db
+      - event-bus
+    environment:
+      ORDERS_DATABASE_URL: postgres://user:password@orders-db:5432/orders_db
+      EVENT_BUS_URL: amqp://event-bus:5672
+      PORT: 3005
+    ports:
+      - "3005:3005"
