@@ -101,7 +101,14 @@ cd ecommerce-urbano
 npm install
 ```
 
-### 2. Levantar infraestructura (bases de datos + RabbitMQ)
+### 2. Configurar variables de entorno (recomendado)
+
+```bash
+cp .env.example .env
+# Edita .env si quieres cambiar usuario/contraseña de DB o JWT_SECRET
+```
+
+### 3. Levantar infraestructura (bases de datos + RabbitMQ)
 
 ```bash
 npm run infrastructure:up
@@ -109,7 +116,7 @@ npm run infrastructure:up
 
 Esto levanta en segundo plano: 4 PostgreSQL (catalog, users, orders, inventory) y RabbitMQ con healthchecks.
 
-### 3. Ejecutar la aplicación
+### 4. Ejecutar la aplicación
 
 **Opción A – Todo con Docker (recomendado para probar el sistema completo)**
 
@@ -140,7 +147,7 @@ npm run start:dev order-service
 
 Cada servicio usa por defecto su puerto (3001, 3002, 3003, 3004, 3005) si no se define `PORT`.
 
-### 4. Bajar infraestructura
+### 5. Bajar infraestructura
 
 ```bash
 npm run infrastructure:down
@@ -150,20 +157,29 @@ docker-compose down
 
 ---
 
-## Variables de entorno (despliegue)
+## Variables de entorno (.env)
 
-Cada servicio se configura por variables de entorno. En Docker Compose ya vienen definidas; para **AWS** (o otro cloud) conviene centralizarlas en Secrets Manager/Parameter Store o en el task definition.
+El proyecto usa un archivo **`.env`** para la configuración. Docker Compose lo carga automáticamente.
 
-| Variable | Servicios | Descripción |
-|----------|-----------|-------------|
-| `PORT` | Todos | Puerto HTTP (por defecto según servicio) |
-| `DATABASE_URL` | catalog, users, inventory | URL Postgres (`postgres://user:pass@host:5432/db`) |
-| `ORDERS_DATABASE_URL` | order-service | URL Postgres de órdenes |
-| `EVENT_BUS_URL` | catalog, inventory, order | URL RabbitMQ (`amqp://host:5672`) |
-| `JWT_SECRET` | auth, users | Secreto para firmar/validar JWT |
-| `USERS_SERVICE_URL` | auth-service | URL base del users-service (ej. `http://users-service:3000`) |
+1. **Copia el ejemplo y edita los valores:**
+   ```bash
+   cp .env.example .env
+   ```
+2. Ajusta en `.env` al menos `POSTGRES_USER`, `POSTGRES_PASSWORD` y `JWT_SECRET` (en producción usa valores seguros).
+3. **No subas `.env`** al repositorio; ya está en `.gitignore`.
 
-En producción: desactivar `synchronize` de TypeORM y usar **migraciones**; guardar secretos en un gestor de secretos (AWS Secrets Manager, etc.).
+Sin `.env`, Docker Compose usa valores por defecto para desarrollo local (user/password, secrets de ejemplo).
+
+| Variable | Uso | Descripción |
+|----------|-----|-------------|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` | Compose + servicios | Usuario y contraseña de las 4 bases PostgreSQL |
+| `POSTGRES_DB_*` | Compose | Nombres de cada base (catalog_db, users_prod, etc.) |
+| `JWT_SECRET` | auth, users | Secreto para firmar/validar JWT; en prod: `openssl rand -base64 32` |
+| `USERS_SERVICE_URL` | auth-service | URL del users-service (en Docker: `http://users-service:3000`) |
+| `EVENT_BUS_URL` | catalog, inventory, order | URL RabbitMQ (en Docker: `amqp://event-bus:5672`) |
+| `NODE_ENV` | Todos | `development` o `production` (afecta logs y TypeORM synchronize) |
+
+En producción: usar un gestor de secretos (AWS Secrets Manager, Vault, etc.) y desactivar `synchronize` de TypeORM; aplicar cambios con **migraciones**.
 
 ---
 
@@ -217,11 +233,25 @@ El código ya incluye una referencia a **Amazon EventBridge** en `apps/catalog-s
 
 ---
 
+## CI/CD
+
+El repo incluye **GitHub Actions**:
+
+| Workflow | Disparador | Qué hace |
+|----------|------------|----------|
+| **CI** (`.github/workflows/ci.yml`) | Push y PR a `main`, `master`, `develop` | `npm ci` → `npm run lint` → `npm run build:all` |
+| **CD** (`.github/workflows/cd.yml`) | Push a `main` / `master` | Build de las 5 imágenes Docker y push a **GitHub Container Registry** (ghcr.io) |
+
+Las imágenes se publican como `ghcr.io/<tu-org>/urbano-<servicio>:latest` (y por SHA de commit). Detalles en [docs/CI-CD.md](docs/CI-CD.md).
+
+---
+
 ## Scripts del monorepo
 
 | Script | Descripción |
 |--------|-------------|
-| `npm run build` | Compila todos los servicios (Nest CLI) |
+| `npm run build` | Compila el proyecto por defecto (Nest CLI) |
+| `npm run build:all` | Compila los 5 microservicios (usado en CI) |
 | `npm run start` | Arranca el proyecto por defecto (elegir servicio con `nest start <nombre>`) |
 | `npm run start:dev <servicio>` | Modo watch para un servicio (ej. `catalog-service`) |
 | `npm run infrastructure:up` | `docker-compose up -d` (solo infra) |
@@ -234,18 +264,35 @@ El código ya incluye una referencia a **Amazon EventBridge** en `apps/catalog-s
 
 ```
 ecommerce-urbano/
+├── .env.example           # Plantilla de variables de entorno (copiar a .env)
+├── .github/workflows/     # CI (lint + build) y CD (imágenes Docker a GHCR)
+│   ├── ci.yml
+│   └── cd.yml
 ├── apps/
 │   ├── auth-service/      # Login JWT, consume users
 │   ├── catalog-service/   # Productos, emite eventos
 │   ├── inventory-service/ # Stock, consume product_created y order_created
 │   ├── order-service/     # Órdenes, emite order_created
 │   └── users-service/     # Usuarios y validación para auth
-├── docker-compose.yml     # Infra + todos los microservicios
-├── nest-cli.json         # Monorepo Nest (proyectos por app)
+├── docs/
+│   ├── CI-CD.md           # Descripción de los workflows de GitHub Actions
+│   └── PLAN-MEJORAS.md     # Roadmap Deploy, Seguridad, Observabilidad, Costos, Operación
+├── docker-compose.yml     # Infra + microservicios (lee .env)
+├── nest-cli.json          # Monorepo Nest (proyectos por app)
 └── package.json           # Workspaces: apps/*
 ```
 
 Cada servicio suele seguir una estructura por capas: `application/`, `infrastructure/`, y en algunos `domain/`.
+
+---
+
+## Documentación adicional
+
+| Recurso | Descripción |
+|---------|-------------|
+| [.env.example](.env.example) | Plantilla de variables de entorno; copiar a `.env` y ajustar valores. |
+| [docs/CI-CD.md](docs/CI-CD.md) | Detalle de los workflows de GitHub Actions (CI y CD). |
+| [docs/PLAN-MEJORAS.md](docs/PLAN-MEJORAS.md) | Plan de mejoras: Deploy, Seguridad, Observabilidad, Costos y Operación. |
 
 ---
 

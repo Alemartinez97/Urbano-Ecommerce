@@ -1,19 +1,21 @@
-# Archivo: docker-compose.yml (Raíz del proyecto)
+# Urbano E-commerce – Docker Compose
+# Las variables se leen desde el archivo .env (copia de .env.example).
+# Sin .env se usan valores por defecto para desarrollo local.
 
 services:
   # --- INFRAESTRUCTURA DE DATOS ---
-  
+
   catalog-db:
     image: postgres:15-alpine
     container_name: urbano-catalog-db
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: catalog_db
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB_CATALOG:-catalog_db}
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d catalog_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB_CATALOG:-catalog_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,13 +24,13 @@ services:
     image: postgres:15-alpine
     container_name: users-db
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: users_prod
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB_USERS:-users_prod}
     ports:
       - "5434:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d users_prod"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB_USERS:-users_prod}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -37,13 +39,13 @@ services:
     image: postgres:15-alpine
     container_name: urbano-orders-db
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: orders_db
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB_ORDERS:-orders_db}
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d orders_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB_ORDERS:-orders_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -52,13 +54,13 @@ services:
     image: postgres:15-alpine
     container_name: urbano-inventory-db
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: inventory_db
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB_INVENTORY:-inventory_db}
     ports:
       - "5435:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d inventory_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB_INVENTORY:-inventory_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -89,8 +91,9 @@ services:
       event-bus:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://user:password@catalog-db:5432/catalog_db
-      EVENT_BUS_URL: amqp://event-bus:5672
+      DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@catalog-db:5432/${POSTGRES_DB_CATALOG:-catalog_db}
+      EVENT_BUS_URL: ${EVENT_BUS_URL:-amqp://event-bus:5672}
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
     ports:
       - "3001:3000"
@@ -105,8 +108,9 @@ services:
       users-db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://user:password@users-db:5432/users_prod
-      JWT_SECRET: ${JWT_SECRET:-super_secret_key_123}
+      DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@users-db:5432/${POSTGRES_DB_USERS:-users_prod}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
     ports:
       - "3002:3000"
@@ -121,9 +125,10 @@ services:
       users-service:
         condition: service_started
     environment:
-      - PORT=3003
-      - JWT_SECRET=super-secret-key-123
-      - USERS_SERVICE_URL=http://users-service:3000
+      PORT: 3003
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      USERS_SERVICE_URL: ${USERS_SERVICE_URL:-http://users-service:3000}
+      NODE_ENV: ${NODE_ENV:-development}
     ports:
       - "3003:3003"
 
@@ -139,8 +144,9 @@ services:
       event-bus:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://user:password@inventory-db:5432/inventory_db
-      EVENT_BUS_URL: amqp://event-bus:5672
+      DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@inventory-db:5432/${POSTGRES_DB_INVENTORY:-inventory_db}
+      EVENT_BUS_URL: ${EVENT_BUS_URL:-amqp://event-bus:5672}
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3004
     ports:
       - "3004:3004"
@@ -157,8 +163,9 @@ services:
       event-bus:
         condition: service_healthy
     environment:
-      ORDERS_DATABASE_URL: postgres://user:password@orders-db:5432/orders_db
-      EVENT_BUS_URL: amqp://event-bus:5672
+      ORDERS_DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@orders-db:5432/${POSTGRES_DB_ORDERS:-orders_db}
+      EVENT_BUS_URL: ${EVENT_BUS_URL:-amqp://event-bus:5672}
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3005
     ports:
       - "3005:3005"
