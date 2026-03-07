@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const logger = new Logger('AuthService');
@@ -26,7 +27,9 @@ async function bootstrap() {
   // 3. CORS: Importante para que tu frontend o Postman no tengan bloqueos
   app.enableCors();
 
-  await app.listen(port);
+  const config = new DocumentBuilder().setTitle("Urbano - auth-service").setVersion("1.0").build(); 
+  const document = SwaggerModule.createDocument(app, config); 
+  SwaggerModule.setup("api/docs", app, document);  await app.listen(port);
   
   logger.log(`🔐 Auth Microservice is running on: http://localhost:${port}/api`);
 }

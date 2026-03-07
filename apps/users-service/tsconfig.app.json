@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../dist/apps/auth-service",
+    "outDir": "../../dist/apps/users-service",
     "types": ["node"]
   },
   "include": ["src/**/*"],

@@ -30,4 +30,19 @@ export class InventoryService {
       return await this.inventoryRepo.save(item);
     }
   }
+
+  /**
+   * Descuenta stock cuando se crea una orden (evento order_created desde order-service).
+   * Si no hay stock suficiente, descuenta hasta 0 y no lanza error (el negocio puede compensar después).
+   */
+  async handleOrderCreated(data: { orderId: string; items: { productId: string; quantity: number; price?: number }[] }) {
+    for (const item of data.items) {
+      const inventory = await this.inventoryRepo.findOne({ where: { productId: item.productId } });
+      if (inventory) {
+        const newQuantity = Math.max(0, inventory.quantity - item.quantity);
+        inventory.quantity = newQuantity;
+        await this.inventoryRepo.save(inventory);
+      }
+    }
+  }
 }

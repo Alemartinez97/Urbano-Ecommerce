@@ -6,9 +6,13 @@ import { InventoryService } from '../../application/services/inventory.service';
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
-  @EventPattern('product_created') // El nombre del evento que emite el Catalog
-  async handleProductCreated(@Payload() data: any) {
-    console.log('Evento recibido en Inventory:', data);
+  @EventPattern('product_created')
+  async handleProductCreated(@Payload() data: { id: string }) {
     return await this.inventoryService.handleProductCreated(data);
+  }
+
+  @EventPattern('order_created')
+  async handleOrderCreated(@Payload() data: { orderId: string; items: { productId: string; quantity: number; price?: number }[] }) {
+    return await this.inventoryService.handleOrderCreated(data);
   }
 }

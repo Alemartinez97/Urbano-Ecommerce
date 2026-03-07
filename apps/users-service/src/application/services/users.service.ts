@@ -1,21 +1,39 @@
 import { Injectable, ConflictException, InternalServerErrorException, Inject, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import type { IEncryptionService } from '../../domain/services/encryption.service.interface';
-import { UserEntity } from '../../infraestructure/persistence/user.entity';
+import { UserEntity } from '../../infrastructure/persistence/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
+import {  Repository } from 'typeorm';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
-    
-    // Usamos @Inject con un token de cadena porque las interfaces de TS 
-    // desaparecen en tiempo de ejecución
     @Inject('IEncryptionService')
     private readonly encryptionService: IEncryptionService,
   ) {}
+
+  /**
+   * Busca un usuario por email (usado por auth-service para login)
+   */
+  async findByEmail(email: string): Promise<UserEntity | null> {
+    return this.userRepository.findOne({ where: { email } });
+  }
+
+  /**
+   * Valida email + contraseña y devuelve el usuario sin password (para auth-service).
+   */
+  async validateCredentials(email: string, password: string): Promise<Omit<UserEntity, 'password'> | null> {
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.email = :email', { email })
+      .getOne();
+    if (!user || !(await this.encryptionService.compare(password, user.password))) return null;
+    const { password: _, ...result } = user;
+    return result;
+  }
 
   /**
    * Busca un usuario por su ID único (UUID)
@@ -57,15 +75,10 @@ export class UsersService {
       });
 
       const savedUser = await this.userRepository.save(newUser);
-
-      // 4. Limpieza de datos (Seguridad en la respuesta)
-      const { password: _, ...userWithoutPassword } = savedUser;
-      
-      return userWithoutPassword as UserEntity;
+      return savedUser;
       
     } catch (error) {
-      // Log interno para el desarrollador (opcional pero recomendado)
-      // console.error(error); 
+      console.error(error); 
       throw new InternalServerErrorException('Error al procesar el registro');
     }
   }

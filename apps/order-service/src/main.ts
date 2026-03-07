@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 
 async function bootstrap() {
@@ -27,7 +28,9 @@ async function bootstrap() {
   // 4. Habilitamos CORS para que tu App en React Native pueda pegarle sin dramas
   app.enableCors();
 
-  await app.listen(port);
+  const config = new DocumentBuilder().setTitle("Urbano - order-service").setVersion("1.0").build(); 
+  const document = SwaggerModule.createDocument(app, config); 
+  SwaggerModule.setup("api/docs", app, document);  await app.listen(port);
   
   logger.log(`🛒 Orders Microservice is running on: http://localhost:${port}/api`);
 }

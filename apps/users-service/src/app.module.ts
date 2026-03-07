@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { UsersModule } from './infraestructure/modules/users.module';
+import { UsersModule } from './infrastructure/modules/users.module';
+import { UserEntity } from './infrastructure/persistence/user.entity';
 
 
 @Module({
@@ -13,12 +14,12 @@ import { UsersModule } from './infraestructure/modules/users.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
+        autoLoadEntities: true,
         type: 'postgres',
-        // Usamos la URL que definimos en el docker-compose.yml
         url: configService.get<string>('DATABASE_URL'),
-        autoLoadEntities: true, 
-        synchronize: true, 
-        logging: process.env.NODE_ENV !== 'production',
+        entities: [UserEntity],
+        synchronize: true,
+        logging: true,
       }),
     }),
     UsersModule,

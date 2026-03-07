@@ -1,11 +1,25 @@
+import { IsString, IsNumber, IsOptional, IsBoolean, Min } from 'class-validator';
+
 export class CreateProductDto {
-    name: string;
-    description?: string;
-    price: number;
-    stock?: number;
-    category?: string;
-    active?: boolean;
-  }
+  @IsString()
+  name: string;
+  @IsString()
+  description: string;
+  @IsNumber()
+  @Min(0)
+  price: number;
+  @IsString()
+  sku: string;
+  @IsString()
+  categoryId: string;
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  stock?: number;
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
   
   export interface UpdateProductDto extends Partial<CreateProductDto> {
     id: string;

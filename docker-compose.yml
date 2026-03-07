@@ -1,4 +1,5 @@
-# Nota: Eliminamos 'version' porque ya es obsoleta en Docker Compose V2
+# Archivo: docker-compose.yml (Raíz del proyecto)
+
 services:
   # --- INFRAESTRUCTURA DE DATOS ---
   
@@ -11,6 +12,11 @@ services:
       POSTGRES_DB: catalog_db
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d catalog_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   users-db:
     image: postgres:15-alpine
@@ -21,6 +27,11 @@ services:
       POSTGRES_DB: users_prod
     ports:
       - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d users_prod"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   orders-db:
     image: postgres:15-alpine
@@ -31,56 +42,11 @@ services:
       POSTGRES_DB: orders_db
     ports:
       - "5433:5432"
-
-  event-bus:
-    image: rabbitmq:3-management-alpine
-    container_name: urbano-event-bus
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-
-  # --- MICROSERVICIOS ---
-
-  catalog-service:
-    build:
-      context: .
-      dockerfile: apps/catalog-service/Dockerfile
-    container_name: catalog-service
-    depends_on:
-      - catalog-db
-      - event-bus
-    environment:
-      DATABASE_URL: postgres://user:password@catalog-db:5432/catalog_db
-      EVENT_BUS_URL: amqp://event-bus:5672
-    ports:
-      - "3001:3000"
-
-  users-service:
-    build:
-      context: .
-      dockerfile: apps/users-service/Dockerfile
-    container_name: users-service
-    depends_on:
-      - users-db
-    environment:
-      DATABASE_URL: postgres://user:password@users-db:5432/users_prod
-      JWT_SECRET: ${JWT_SECRET:-super_secret_key_123} 
-    ports:
-      - "3002:3000"
-
-  auth-service: # Alineado correctamente con los otros servicios
-    build:
-      context: .
-      dockerfile: apps/auth-service/Dockerfile
-    container_name: auth-service
-    environment:
-      - PORT=3003
-      - JWT_SECRET=super-secret-key-123
-      - USERS_SERVICE_URL=http://users-service:3000 # Puerto interno del contenedor
-    ports:
-      - "3003:3003"
-    depends_on:
-      - users-service
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d orders_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   inventory-db:
     image: postgres:15-alpine
@@ -90,16 +56,88 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: inventory_db
     ports:
-      - "5435:5432" # Siguiente puerto disponible
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d inventory_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  event-bus:
+    image: rabbitmq:3-management-alpine
+    container_name: urbano-event-bus
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- MICROSERVICIOS ---
+
+  catalog-service:
+    build:
+      context: .
+      dockerfile: apps/catalog-service/Dockerfile
+    container_name: catalog-service
+    restart: always
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+      event-bus:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://user:password@catalog-db:5432/catalog_db
+      EVENT_BUS_URL: amqp://event-bus:5672
+      PORT: 3000
+    ports:
+      - "3001:3000"
+
+  users-service:
+    build:
+      context: .
+      dockerfile: apps/users-service/Dockerfile
+    container_name: users-service
+    restart: always
+    depends_on:
+      users-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://user:password@users-db:5432/users_prod
+      JWT_SECRET: ${JWT_SECRET:-super_secret_key_123}
+      PORT: 3000
+    ports:
+      - "3002:3000"
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: auth-service
+    restart: always
+    depends_on:
+      users-service:
+        condition: service_started
+    environment:
+      - PORT=3003
+      - JWT_SECRET=super-secret-key-123
+      - USERS_SERVICE_URL=http://users-service:3000
+    ports:
+      - "3003:3003"
 
   inventory-service:
     build:
       context: .
       dockerfile: apps/inventory-service/Dockerfile
     container_name: inventory-service
+    restart: always
     depends_on:
-      - inventory-db
-      - event-bus
+      inventory-db:
+        condition: service_healthy
+      event-bus:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgres://user:password@inventory-db:5432/inventory_db
       EVENT_BUS_URL: amqp://event-bus:5672
@@ -107,17 +145,17 @@ services:
     ports:
       - "3004:3004"
 
-
-      # ... (resto de servicios igual)
-
   order-service:
     build:
       context: .
       dockerfile: apps/order-service/Dockerfile
     container_name: order-service
+    restart: always
     depends_on:
-      - orders-db
-      - event-bus
+      orders-db:
+        condition: service_healthy
+      event-bus:
+        condition: service_healthy
     environment:
       ORDERS_DATABASE_URL: postgres://user:password@orders-db:5432/orders_db
       EVENT_BUS_URL: amqp://event-bus:5672
