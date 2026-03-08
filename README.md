@@ -1,25 +1,25 @@
 # Urbano Ecommerce
 
-Monorepo de microservicios para ecommerce, construido con **NestJS**, **PostgreSQL** y **RabbitMQ**. Migración del proyecto [nestjs-ecommerce](https://github.com/hsn656/nestjs-ecommerce) a una arquitectura moderna y escalable.
+Microservices monorepo for ecommerce, built with **NestJS**, **PostgreSQL**, and **RabbitMQ**. Migration of [nestjs-ecommerce](https://github.com/hsn656/nestjs-ecommerce) to a modern, scalable architecture.
 
 ---
 
-## Migración desde nestjs-ecommerce
+## Migration from nestjs-ecommerce
 
-Este proyecto es la evolución del ecommerce monolítico [hsn656/nestjs-ecommerce](https://github.com/hsn656/nestjs-ecommerce). Cambios principales:
+This project is the evolution of the monolithic [hsn656/nestjs-ecommerce](https://github.com/hsn656/nestjs-ecommerce). Main changes:
 
-| Antes (monolito) | Ahora (ecommerce-urbano) |
-|------------------|---------------------------|
-| Una aplicación NestJS | **5 microservicios** independientes |
-| Una base PostgreSQL | **Database per service**: 4 instancias PostgreSQL |
-| Lógica en un solo proceso | **Comunicación HTTP** entre servicios + **eventos** vía RabbitMQ |
-| Despliegue único | Contenedores por servicio, listos para **escalar y desplegar en AWS** |
+| Before (monolith) | Now (ecommerce-urbano) |
+|-------------------|------------------------|
+| Single NestJS app | **5 independent microservices** |
+| One PostgreSQL DB | **Database per service**: 4 PostgreSQL instances |
+| Logic in one process | **HTTP** between services + **events** via RabbitMQ |
+| Single deployment | Containers per service, ready to **scale and deploy on AWS** |
 
-Se mantiene el stack base (NestJS, TypeORM, PostgreSQL) y se añaden JWT/Passport, Swagger, Config por entorno y bus de eventos.
+The same stack (NestJS, TypeORM, PostgreSQL) is kept; JWT/Passport, Swagger, env-based config, and event bus are added.
 
 ---
 
-## Arquitectura
+## Architecture
 
 ```
                     ┌─────────────────┐
@@ -56,18 +56,22 @@ Se mantiene el stack base (NestJS, TypeORM, PostgreSQL) y se añaden JWT/Passpor
                └──────────────┘
 ```
 
-### Servicios y puertos (host)
+### Services and ports (host)
 
-| Servicio | Puerto | Descripción |
-|----------|--------|-------------|
-| **catalog-service** | 3001 | Catálogo de productos; emite `product_created` y `product_updated` |
-| **users-service** | 3002 | Usuarios (registro, validación para login) |
-| **auth-service** | 3003 | Login JWT; consume users-service |
-| **inventory-service** | 3004 | Stock; escucha `product_created` y `order_created`, descuenta stock |
-| **order-service** | 3005 | Órdenes; emite `order_created` |
-| **RabbitMQ (management)** | 15672 | UI de gestión del event bus |
+| Service | Port | Description |
+|---------|------|-------------|
+| **catalog-service** | 3001 | Product catalog; emits `product_created` and `product_updated` |
+| **users-service** | 3002 | Users (registration, validation for login) |
+| **auth-service** | 3003 | JWT login; consumes users-service |
+| **inventory-service** | 3004 | Stock; listens to `product_created` and `order_created`, decrements stock |
+| **order-service** | 3005 | Orders; emits `order_created` |
+| **RabbitMQ (management)** | 15672 | Event bus management UI |
 
-Todas las APIs comparten el prefijo **`/api`** y exponen Swagger en **`/api/docs`**.
+All APIs use the **`/api`** prefix and expose Swagger at **`/api/docs`**.
+
+**Observability:** each service exposes **GET `/api/health`** (returns `{ status: 'ok', service: '...' }`). Docker Compose uses this for container healthchecks.
+
+**Logs:** all services use a structured logger (`common/logger`): in **development** human-readable output with timestamp, level, service and context; in **production** (`NODE_ENV=production`) one JSON line per event for aggregators (CloudWatch, Loki, etc.).
 
 ---
 
@@ -76,24 +80,24 @@ Todas las APIs comparten el prefijo **`/api`** y exponen Swagger en **`/api/docs
 - **Runtime:** Node.js 20  
 - **Framework:** NestJS 10  
 - **ORM:** TypeORM  
-- **Bases de datos:** PostgreSQL 15  
+- **Databases:** PostgreSQL 15  
 - **Event bus:** RabbitMQ 3  
 - **Auth:** JWT (Passport)  
 - **API docs:** Swagger  
 
 ---
 
-## Requisitos previos
+## Prerequisites
 
 - Node.js 20+
-- Docker y Docker Compose
+- Docker and Docker Compose
 - npm 9+ (workspaces)
 
 ---
 
-## Instalación y ejecución
+## Installation and running
 
-### 1. Clonar e instalar dependencias
+### 1. Clone and install dependencies
 
 ```bash
 git clone <repo>
@@ -101,30 +105,30 @@ cd ecommerce-urbano
 npm install
 ```
 
-### 2. Configurar variables de entorno (recomendado)
+### 2. Configure environment variables (recommended)
 
 ```bash
 cp .env.example .env
-# Edita .env si quieres cambiar usuario/contraseña de DB o JWT_SECRET
+# Edit .env to set DB user/password and JWT_SECRET if needed
 ```
 
-### 3. Levantar infraestructura (bases de datos + RabbitMQ)
+### 3. Start infrastructure (databases + RabbitMQ)
 
 ```bash
 npm run infrastructure:up
 ```
 
-Esto levanta en segundo plano: 4 PostgreSQL (catalog, users, orders, inventory) y RabbitMQ con healthchecks.
+This starts in the background: 4 PostgreSQL (catalog, users, orders, inventory) and RabbitMQ with healthchecks.
 
-### 4. Ejecutar la aplicación
+### 4. Run the application
 
-**Opción A – Todo con Docker (recomendado para probar el sistema completo)**
+**Option A – Full stack with Docker (recommended to try the whole system)**
 
 ```bash
 docker-compose up -d
 ```
 
-Los microservicios se construyen y arrancan tras las dependencias. URLs:
+Microservices are built and started after dependencies. URLs:
 
 - Catalog: http://localhost:3001/api  
 - Users: http://localhost:3002/api  
@@ -133,175 +137,202 @@ Los microservicios se construyen y arrancan tras las dependencias. URLs:
 - Orders: http://localhost:3005/api  
 - RabbitMQ UI: http://localhost:15672 (guest/guest)
 
-**Opción B – Solo infraestructura + servicios en local**
+**Option B – Infrastructure only + run services locally**
 
 ```bash
 npm run infrastructure:up
 npm run build
-npm run start:dev catalog-service    # en una terminal
-npm run start:dev users-service      # en otra
+npm run start:dev catalog-service    # in one terminal
+npm run start:dev users-service       # in another
 npm run start:dev auth-service
 npm run start:dev inventory-service
 npm run start:dev order-service
 ```
 
-Cada servicio usa por defecto su puerto (3001, 3002, 3003, 3004, 3005) si no se define `PORT`.
+Each service uses its default port (3001–3005) if `PORT` is not set.
 
-### 5. Bajar infraestructura
+### 5. Stop infrastructure
 
 ```bash
 npm run infrastructure:down
-# o, si levantaste todo con Docker:
+# or, if you started everything with Docker:
 docker-compose down
 ```
 
 ---
 
-## Variables de entorno (.env)
+## Environment variables (.env)
 
-El proyecto usa un archivo **`.env`** para la configuración. Docker Compose lo carga automáticamente.
+The project uses a **`.env`** file for configuration. Docker Compose loads it automatically.
 
-1. **Copia el ejemplo y edita los valores:**
+1. **Copy the example and edit values:**
    ```bash
    cp .env.example .env
    ```
-2. Ajusta en `.env` al menos `POSTGRES_USER`, `POSTGRES_PASSWORD` y `JWT_SECRET` (en producción usa valores seguros).
-3. **No subas `.env`** al repositorio; ya está en `.gitignore`.
+2. Set at least `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `JWT_SECRET` in `.env` (use strong values in production).
+3. **Do not commit `.env`**; it is in `.gitignore`.
 
-Sin `.env`, Docker Compose usa valores por defecto para desarrollo local (user/password, secrets de ejemplo).
+Without `.env`, Docker Compose uses defaults for local development (user/password, example secrets).
 
-| Variable | Uso | Descripción |
-|----------|-----|-------------|
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` | Compose + servicios | Usuario y contraseña de las 4 bases PostgreSQL |
-| `POSTGRES_DB_*` | Compose | Nombres de cada base (catalog_db, users_prod, etc.) |
-| `JWT_SECRET` | auth, users | Secreto para firmar/validar JWT; en prod: `openssl rand -base64 32` |
-| `USERS_SERVICE_URL` | auth-service | URL del users-service (en Docker: `http://users-service:3000`) |
-| `EVENT_BUS_URL` | catalog, inventory, order | URL RabbitMQ (en Docker: `amqp://event-bus:5672`) |
-| `NODE_ENV` | Todos | `development` o `production` (afecta logs y TypeORM synchronize) |
+| Variable | Used by | Description |
+|----------|---------|-------------|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` | Compose + services | User and password for the 4 PostgreSQL databases |
+| `POSTGRES_DB_*` | Compose | Name of each database (catalog_db, users_prod, etc.) |
+| `JWT_SECRET` | auth, users, catalog, order | JWT secret; in prod: `openssl rand -base64 32` |
+| `USERS_SERVICE_URL` | auth-service | URL of users-service (in Docker: `http://users-service:3000`) |
+| `EVENT_BUS_URL` | catalog, inventory, order | RabbitMQ URL (in Docker: `amqp://event-bus:5672`) |
+| `CORS_ORIGIN` | All | Allowed origins, comma-separated; empty = all (dev) |
+| `NODE_ENV` | All | `development` or `production` (affects logs and TypeORM synchronize) |
 
-En producción: usar un gestor de secretos (AWS Secrets Manager, Vault, etc.) y desactivar `synchronize` de TypeORM; aplicar cambios con **migraciones**.
+In production: use a secrets manager (AWS Secrets Manager, Vault, etc.) and disable TypeORM `synchronize`; apply schema changes with **migrations**.
 
 ---
 
-## Despliegue en AWS
+## Security
 
-El proyecto está preparado para AWS en el sentido de que:
+- **Helmet:** security HTTP headers on all services.
+- **CORS:** configurable via `CORS_ORIGIN`; restrict origins in production.
+- **JWT:** creating a product (catalog) and creating an order (order) require `Authorization: Bearer <token>` (obtained via POST `/api/auth/login`).
+- **Rate limiting:** login endpoint is throttled to mitigate brute force.
 
-- Cada servicio tiene **Dockerfile** y se ejecuta como contenedor.
-- Toda la configuración va por **variables de entorno** (sin hardcodear URLs ni secretos).
-- La comunicación entre servicios es por **HTTP** y **mensajería (RabbitMQ)**, fácil de reemplazar por servicios gestionados en AWS.
+---
 
-### Componentes recomendados en AWS
+## AWS deployment
 
-| Componente | Uso en el proyecto | Opción en AWS |
-|------------|--------------------|----------------|
-| **Contenedores** | Una imagen por microservicio | **Amazon ECS (Fargate)** o EKS |
-| **Registro de imágenes** | Build desde cada `apps/*/Dockerfile` | **Amazon ECR** (un repositorio por servicio o por app) |
-| **Bases de datos** | 4 PostgreSQL (catalog, users, orders, inventory) | **Amazon RDS** (una instancia con 4 BDs) o **Aurora PostgreSQL** (multi-DB) |
-| **Event bus** | RabbitMQ en Docker | **Amazon MQ (RabbitMQ)** o **Amazon SQS/SNS** (requiere adaptar el código a SDK AWS) |
-| **Secrets** | `JWT_SECRET`, connection strings | **AWS Secrets Manager** o **Systems Manager Parameter Store** |
-| **Tráfico entrante** | Varios puertos (3001–3005) | **Application Load Balancer (ALB)** con reglas por path o por subdominio |
-| **DNS** | N/A | **Route 53** (opcional) |
+The **code is ready** for AWS (Dockerfiles, health checks, env-based config, CD to ECR). This repo only documents the **strategy**; it does not include infrastructure code (Terraform/CloudFormation). Summary:
 
-### Flujo típico de despliegue en AWS
+- Each service has a **Dockerfile** and runs as a container.
+- All configuration is via **environment variables** (no hardcoded URLs or secrets).
+- Communication between services is **HTTP** and **messaging (RabbitMQ)**.
 
-1. **Build y push de imágenes**  
-   Construir cada servicio con su Dockerfile y subir a ECR (por ejemplo con GitHub Actions o AWS CodeBuild).
+**Deploy in 5 steps:** Terraform in `infra/terraform/` creates ECR repos; then set GitHub secrets and push to `main`. See **[infra/README.md](infra/README.md)**. Full guide: [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md). Strategy: [docs/ESTRATEGIA-AWS.md](docs/ESTRATEGIA-AWS.md).
 
-2. **Infraestructura**  
-   - VPC, subnets, security groups.  
-   - RDS (o Aurora) con 4 bases de datos (o 4 instancias si se prefiere aislar por servicio).  
-   - Amazon MQ para RabbitMQ o migración a SQS/SNS.  
-   - ECR para las imágenes.
+### Recommended AWS components
 
-3. **ECS**  
-   - Cluster ECS (Fargate).  
-   - Task definitions por servicio: imagen ECR, variables de entorno y secretos (desde Secrets Manager).  
-   - Servicios ECS que mantengan N tareas por microservicio.  
-   - Health checks sobre `/api` o un endpoint dedicado.
+| Component | Project usage | AWS option |
+|-----------|----------------|------------|
+| **Containers** | One image per microservice | **Amazon ECS (Fargate)** or EKS |
+| **Image registry** | Build from each `apps/*/Dockerfile` | **Amazon ECR** (one repo per service or per app) |
+| **Databases** | 4 PostgreSQL (catalog, users, orders, inventory) | **Amazon RDS** (one instance with 4 DBs) or **Aurora PostgreSQL** |
+| **Event bus** | RabbitMQ in Docker | **Amazon MQ (RabbitMQ)** or **SQS/SNS** (would require code changes) |
+| **Secrets** | `JWT_SECRET`, connection strings | **AWS Secrets Manager** or **Systems Manager Parameter Store** |
+| **Ingress** | Multiple ports (3001–3005) | **Application Load Balancer (ALB)** with path or subdomain rules |
+| **DNS** | N/A | **Route 53** (optional) |
 
-4. **Red y tráfico**  
-   - ALB con listeners HTTPS (certificado en ACM).  
-   - Reglas por path (ej. `/api/catalog*` → catalog-service, `/api/orders*` → order-service) o por host.  
-   - En ECS: target groups por servicio y registro automático de las tareas.
+### Typical AWS deployment flow
 
-5. **Comunicación entre servicios**  
-   - `USERS_SERVICE_URL`: URL interna del ALB o del servicio de discovery (ej. Cloud Map) que apunte al users-service.  
-   - `DATABASE_URL` y `EVENT_BUS_URL`: endpoints de RDS y Amazon MQ en la VPC.
+1. **Build and push images** to ECR (e.g. via GitHub Actions or AWS CodeBuild).
+2. **Infrastructure:** VPC, subnets, security groups; RDS (or Aurora) with 4 databases; Amazon MQ for RabbitMQ; ECR for images.
+3. **ECS:** Cluster (Fargate); task definitions per service with ECR image, env vars and secrets (from Secrets Manager); services with health checks on `/api` or a dedicated endpoint.
+4. **Network:** ALB with HTTPS (ACM certificate); path rules (e.g. `/api/catalog*` → catalog-service); target groups and ECS service registration.
+5. **Service communication:** `USERS_SERVICE_URL` points to users-service (ALB internal URL or service discovery); `DATABASE_URL` and `EVENT_BUS_URL` from RDS and Amazon MQ in the VPC.
 
-El código ya incluye una referencia a **Amazon EventBridge** en `apps/catalog-service/src/infrastructure/adapters/messaging/event-bridge.adapter.ts`; en producción se puede sustituir el envío por RabbitMQ por EventBridge o SNS si se adopta el bus de eventos de AWS.
+---
+
+## E2E tests (Jest)
+
+E2E tests run against live services (real HTTP).
+
+**Requirement:** stack up (`docker-compose up -d`) and wait for services to be ready.
+
+```bash
+docker-compose up -d
+# Wait ~20s for all to be healthy
+npm run test:e2e
+```
+
+They cover:
+
+- **Health:** GET `/api/health` on all 5 microservices.
+- **Auth:** user registration and login (token).
+- **Catalog:** GET products, POST without token (401), POST with token (create product).
+- **Order:** POST without token (401), POST with token (create order).
+
+Default URLs are `http://localhost:3001` … `3005`. Override with `TEST_CATALOG_URL`, `TEST_USERS_URL`, etc. For catalog/order with token you can set `TEST_USER_EMAIL` and `TEST_USER_PASSWORD`, or the tests register a new user.
 
 ---
 
 ## CI/CD
 
-El repo incluye **GitHub Actions**:
+The repo uses **GitHub Actions**:
 
-| Workflow | Disparador | Qué hace |
-|----------|------------|----------|
-| **CI** (`.github/workflows/ci.yml`) | Push y PR a `main`, `master`, `develop` | `npm ci` → `npm run lint` → `npm run build:all` |
-| **CD** (`.github/workflows/cd.yml`) | Push a `main` / `master` | Build de las 5 imágenes Docker y push a **GitHub Container Registry** (ghcr.io) |
+| Workflow | Trigger | What it does |
+|----------|---------|----------------|
+| **CI** (`.github/workflows/ci.yml`) | Push and PR to `main`, `master`, `develop` | `npm ci` → `npm run lint` → `npm run build:all` |
+| **CD** (`.github/workflows/cd.yml`) | Push to `main` / `master` | Builds 5 images and pushes to **GitHub Container Registry** (ghcr.io) |
+| **CD (ECR)** (`.github/workflows/cd-ecr.yml`) | Push to `main` / `master` (or manual) | Builds 5 images and pushes to **Amazon ECR** (for AWS deployment) |
 
-Las imágenes se publican como `ghcr.io/<tu-org>/urbano-<servicio>:latest` (y por SHA de commit). Detalles en [docs/CI-CD.md](docs/CI-CD.md).
+Images on GHCR are published as `ghcr.io/<your-org>/urbano-<service>:latest`. For AWS, set secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION`, and create ECR repos `urbano-<service>`. Full guide: [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md). CI/CD details: [docs/CI-CD.md](docs/CI-CD.md).
 
 ---
 
-## Scripts del monorepo
+## Monorepo scripts
 
-| Script | Descripción |
+| Script | Description |
 |--------|-------------|
-| `npm run build` | Compila el proyecto por defecto (Nest CLI) |
-| `npm run build:all` | Compila los 5 microservicios (usado en CI) |
-| `npm run start` | Arranca el proyecto por defecto (elegir servicio con `nest start <nombre>`) |
-| `npm run start:dev <servicio>` | Modo watch para un servicio (ej. `catalog-service`) |
-| `npm run infrastructure:up` | `docker-compose up -d` (solo infra) |
+| `npm run build` | Build default project (Nest CLI) |
+| `npm run build:all` | Build all 5 microservices (used in CI) |
+| `npm run start` | Start default project (choose service with `nest start <name>`) |
+| `npm run start:dev <service>` | Watch mode for one service (e.g. `catalog-service`) |
+| `npm run infrastructure:up` | `docker-compose up -d` (infra only) |
 | `npm run infrastructure:down` | `docker-compose down` |
-| `npm run lint` | ESLint sobre `src`, `apps`, `libs`, `test` |
+| `npm run lint` | ESLint on `src`, `apps`, `test`, `e2e` |
+| `npm run test:e2e` | E2E tests with Jest (requires services running) |
 
 ---
 
-## Estructura del repositorio
+## Repository structure
 
 ```
 ecommerce-urbano/
-├── .env.example           # Plantilla de variables de entorno (copiar a .env)
-├── .github/workflows/     # CI (lint + build) y CD (imágenes Docker a GHCR)
+├── .env.example           # Environment variable template (copy to .env)
+├── .github/workflows/     # CI (lint + build), CD to GHCR and CD to ECR (AWS)
 │   ├── ci.yml
-│   └── cd.yml
+│   ├── cd.yml
+│   └── cd-ecr.yml
 ├── apps/
-│   ├── auth-service/      # Login JWT, consume users
-│   ├── catalog-service/   # Productos, emite eventos
-│   ├── inventory-service/ # Stock, consume product_created y order_created
-│   ├── order-service/     # Órdenes, emite order_created
-│   └── users-service/     # Usuarios y validación para auth
+│   ├── auth-service/      # JWT login, consumes users
+│   ├── catalog-service/   # Products, emits events
+│   ├── inventory-service/ # Stock, consumes product_created and order_created
+│   ├── order-service/     # Orders, emits order_created
+│   └── users-service/     # Users and validation for auth
 ├── docs/
-│   ├── CI-CD.md           # Descripción de los workflows de GitHub Actions
-│   └── PLAN-MEJORAS.md     # Roadmap Deploy, Seguridad, Observabilidad, Costos, Operación
-├── docker-compose.yml     # Infra + microservicios (lee .env)
-├── nest-cli.json          # Monorepo Nest (proyectos por app)
+│   ├── CI-CD.md           # GitHub Actions workflows
+│   ├── ESTRATEGIA-AWS.md  # AWS strategy and “code ready” checklist
+│   ├── DEPLOY-AWS.md      # Full guide: ECR, ECS Fargate, ALB, RDS, Secrets Manager
+│   ├── observability-datadog.md  # Datadog APM, trace/log correlation, env vars
+│   └── PLAN-MEJORAS.md           # Roadmap: Deploy, Security, Observability, Cost, Operations
+├── infra/
+│   ├── README.md          # 5-step AWS deploy (Terraform + GitHub secrets + push)
+│   └── terraform/         # ECR repos (+ optional IAM); run from infra/terraform
+├── docker-compose.yml     # Infra + microservices (reads .env)
+├── nest-cli.json          # Nest monorepo (projects per app)
 └── package.json           # Workspaces: apps/*
 ```
 
-Cada servicio suele seguir una estructura por capas: `application/`, `infrastructure/`, y en algunos `domain/`.
+Each service typically follows a layered structure: `application/`, `infrastructure/`, and in some cases `domain/`.
 
 ---
 
-## Documentación adicional
+## Further documentation
 
-| Recurso | Descripción |
-|---------|-------------|
-| [.env.example](.env.example) | Plantilla de variables de entorno; copiar a `.env` y ajustar valores. |
-| [docs/CI-CD.md](docs/CI-CD.md) | Detalle de los workflows de GitHub Actions (CI y CD). |
-| [docs/PLAN-MEJORAS.md](docs/PLAN-MEJORAS.md) | Plan de mejoras: Deploy, Seguridad, Observabilidad, Costos y Operación. |
-
----
-
-## Plan de mejoras
-
-Roadmap de mejoras en **Deploy**, **Seguridad**, **Observabilidad**, **Costos** y **Operación** en [docs/PLAN-MEJORAS.md](docs/PLAN-MEJORAS.md). Incluye tareas por fases, criterios de éxito y orden sugerido de ejecución.
+| Resource | Description |
+|----------|-------------|
+| [.env.example](.env.example) | Environment variable template; copy to `.env` and adjust. |
+| [docs/CI-CD.md](docs/CI-CD.md) | GitHub Actions workflows (CI and CD). |
+| [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md) | Full AWS deploy guide: ECR, ECS Fargate, ALB, RDS, Secrets Manager. |
+| [docs/ESTRATEGIA-AWS.md](docs/ESTRATEGIA-AWS.md) | AWS strategy and "code ready" checklist. |
+| [docs/observability-datadog.md](docs/observability-datadog.md) | Datadog APM, trace/log correlation, env vars. |
+| [docs/PLAN-MEJORAS.md](docs/PLAN-MEJORAS.md) | Improvement plan: Deploy, Security, Observability, Cost, Operations. |
 
 ---
 
-## Licencia
+## Improvement plan
+
+Roadmap for **Deploy**, **Security**, **Observability**, **Cost**, and **Operations** in [docs/PLAN-MEJORAS.md](docs/PLAN-MEJORAS.md) (tasks by phase, success criteria, suggested order).
+
+---
+
+## License
 
 MIT.

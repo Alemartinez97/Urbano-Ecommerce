@@ -29,8 +29,6 @@ export class ProductService {
   async create(data: CreateProductDto): Promise<ProductEntity> {
     const product = this.productRepository.create(data);
     const savedProduct = await this.productRepository.save(product);
-
-    // 🚀 Notificamos al Inventory Service vía RabbitMQ
     this.client.emit('product_created', {
       id: savedProduct.id,
       name: savedProduct.name,
@@ -45,8 +43,6 @@ export class ProductService {
     if (!product) throw new NotFoundException(`Producto ${id} no encontrado`);
     
     const updatedProduct = await this.productRepository.save(product);
-
-    // Opcional: Notificar cambios de precio o nombre al bus
     this.client.emit('product_updated', {
       id: updatedProduct.id,
       name: updatedProduct.name,

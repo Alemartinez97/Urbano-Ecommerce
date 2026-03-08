@@ -1,9 +1,6 @@
 import { IsString, IsNumber, IsArray, ValidateNested, Min, IsUUID, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
 
-/**
- * DTO para los ítems individuales de la orden
- */
 class OrderItemDto {
   @IsUUID()
   @IsNotEmpty()
@@ -18,9 +15,6 @@ class OrderItemDto {
   price: number;
 }
 
-/**
- * DTO principal para la creación de órdenes
- */
 export class CreateOrderDto {
   @IsUUID()
   @IsNotEmpty()
@@ -28,7 +22,7 @@ export class CreateOrderDto {
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => OrderItemDto) // Necesario para que class-transformer sepa qué clase usar
+  @Type(() => OrderItemDto)
   items: OrderItemDto[];
 
   @IsNumber()

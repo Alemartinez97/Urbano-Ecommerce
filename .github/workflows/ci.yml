@@ -1,4 +1,3 @@
-# CI: Lint y build de todos los microservicios en cada push y PR.
 name: CI
 
 on:

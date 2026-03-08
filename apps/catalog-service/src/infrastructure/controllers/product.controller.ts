@@ -1,8 +1,8 @@
-import { Controller, Get, Post, Body, Param, Put, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { ProductService } from '../../application/services/product.service';
 import { ProductEntity } from '../persistence/product.entity';
 import { CreateProductDto } from '../../application/dtos/product.dto';
-
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @Controller('products')
 export class ProductController {
@@ -19,6 +19,7 @@ export class ProductController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   async create(@Body() createProductDto: CreateProductDto): Promise<ProductEntity> {
     return await this.productService.create(createProductDto);
   }

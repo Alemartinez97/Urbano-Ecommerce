@@ -1,9 +1,4 @@
-# Urbano E-commerce – Docker Compose
-# Las variables se leen desde el archivo .env (copia de .env.example).
-# Sin .env se usan valores por defecto para desarrollo local.
-
 services:
-  # --- INFRAESTRUCTURA DE DATOS ---
 
   catalog-db:
     image: postgres:15-alpine
@@ -77,8 +72,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # --- MICROSERVICIOS ---
-
   catalog-service:
     build:
       context: .
@@ -93,10 +86,21 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@catalog-db:5432/${POSTGRES_DB_CATALOG:-catalog_db}
       EVENT_BUS_URL: ${EVENT_BUS_URL:-amqp://event-bus:5672}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
+      DD_SERVICE: catalog-service
+      DD_ENV: ${DD_ENV:-development}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      DD_API_KEY: ${DD_API_KEY:-}
     ports:
       - "3001:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   users-service:
     build:
@@ -112,8 +116,18 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
+      DD_SERVICE: users-service
+      DD_ENV: ${DD_ENV:-development}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      DD_API_KEY: ${DD_API_KEY:-}
     ports:
       - "3002:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   auth-service:
     build:
@@ -129,8 +143,18 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       USERS_SERVICE_URL: ${USERS_SERVICE_URL:-http://users-service:3000}
       NODE_ENV: ${NODE_ENV:-development}
+      DD_SERVICE: auth-service
+      DD_ENV: ${DD_ENV:-development}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      DD_API_KEY: ${DD_API_KEY:-}
     ports:
       - "3003:3003"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3003/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   inventory-service:
     build:
@@ -148,8 +172,18 @@ services:
       EVENT_BUS_URL: ${EVENT_BUS_URL:-amqp://event-bus:5672}
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3004
+      DD_SERVICE: inventory-service
+      DD_ENV: ${DD_ENV:-development}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      DD_API_KEY: ${DD_API_KEY:-}
     ports:
       - "3004:3004"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3004/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   order-service:
     build:
@@ -165,7 +199,18 @@ services:
     environment:
       ORDERS_DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@orders-db:5432/${POSTGRES_DB_ORDERS:-orders_db}
       EVENT_BUS_URL: ${EVENT_BUS_URL:-amqp://event-bus:5672}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3005
+      DD_SERVICE: order-service
+      DD_ENV: ${DD_ENV:-development}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      DD_API_KEY: ${DD_API_KEY:-}
     ports:
       - "3005:3005"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3005/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

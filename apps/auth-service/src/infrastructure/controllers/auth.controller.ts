@@ -1,4 +1,5 @@
-import { Controller, Post, Body, UnauthorizedException, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from '../../application/services/auth.service';
 import { LoginDto } from '../../application/dtos/login.dto';
 
@@ -8,6 +9,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
   async login(@Body() loginDto: LoginDto) {
     const user = await this.authService.validateUser(loginDto);
     if (!user) {

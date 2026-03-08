@@ -1,14 +1,17 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { logger } from './common/logger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') ?? 3001;
 
+  app.use(helmet());
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({
@@ -17,13 +20,14 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  app.enableCors();
+  const corsOrigin = configService.get<string>('CORS_ORIGIN');
+  app.enableCors(corsOrigin ? { origin: corsOrigin.split(',').map((o) => o.trim()) } : undefined);
 
   const config = new DocumentBuilder().setTitle('Urbano - catalog-service').setVersion('1.0').build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
   await app.listen(port);
-  Logger.log(`Catalog Service running on http://localhost:${port}/api`, 'Bootstrap');
+  logger.log(`Application listening on http://localhost:${port}/api`, 'Bootstrap', { port });
 }
 bootstrap();

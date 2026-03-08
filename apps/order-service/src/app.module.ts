@@ -6,21 +6,16 @@ import { OrderEntity } from './infrastructure/adapters/persistence/order.entity'
 
 @Module({
   imports: [
-    // 1. Configuraciones Globales
     ConfigModule.forRoot({ isGlobal: true }),
-
-    // 2. Conexión a la DB del Microservicio
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('ORDERS_DATABASE_URL'),
         entities: [OrderEntity],
-        synchronize: true, // Acordate de pasarlo a false en prod
+        synchronize: true,
       }),
     }),
-
-    // 3. Importamos el módulo de negocio que ya tiene Controller y Service
     OrderModule,
   ],
 })

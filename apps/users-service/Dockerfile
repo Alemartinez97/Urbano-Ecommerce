@@ -23,5 +23,5 @@ COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY package*.json ./
 
-# Ejecutamos el servicio correspondiente
+ENV NODE_OPTIONS="-r dd-trace/init"
 CMD ["node", "dist/apps/users-service/main"]

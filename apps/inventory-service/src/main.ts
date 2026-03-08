@@ -1,9 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
 import { Transport, MicroserviceOptions } from '@nestjs/microservices';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { logger } from './common/logger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -11,6 +12,7 @@ async function bootstrap() {
   const port = configService.get<number>('PORT') ?? 3004;
   const eventBusUrl = configService.get<string>('EVENT_BUS_URL') ?? 'amqp://event-bus:5672';
 
+  app.use(helmet());
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
@@ -22,6 +24,8 @@ async function bootstrap() {
   await app.startAllMicroservices();
 
   app.setGlobalPrefix('api');
+  const corsOrigin = configService.get<string>('CORS_ORIGIN');
+  app.enableCors(corsOrigin ? { origin: corsOrigin.split(',').map((o) => o.trim()) } : undefined);
   const config = new DocumentBuilder()
     .setTitle('Urbano - inventory-service')
     .setDescription('API para la gestión de inventario y stock')
@@ -32,6 +36,6 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   await app.listen(port);
-  Logger.log(`Inventory Service running on http://localhost:${port}/api`, 'Bootstrap');
+  logger.log(`Application listening on http://localhost:${port}/api`, 'Bootstrap', { port });
 }
 bootstrap();

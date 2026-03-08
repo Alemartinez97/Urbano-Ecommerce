@@ -19,8 +19,6 @@ export class OrderService {
       status: 'CONFIRMED',
     });
     const savedOrder = await this.orderRepository.save(order);
-
-    // 🚀 Notificamos el evento para descontar stock
     this.client.emit('order_created', {
       orderId: savedOrder.id,
       items: savedOrder.items,

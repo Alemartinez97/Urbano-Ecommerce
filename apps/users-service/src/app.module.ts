@@ -19,7 +19,7 @@ import { UserEntity } from './infrastructure/persistence/user.entity';
         url: configService.get<string>('DATABASE_URL'),
         entities: [UserEntity],
         synchronize: true,
-        logging: true,
+        logging: process.env.NODE_ENV === 'development',
       }),
     }),
     UsersModule,

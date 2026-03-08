@@ -1,7 +1,3 @@
-# CD: Build y push de imágenes Docker al GitHub Container Registry (GHCR) en push a main.
-# Requiere: en el repo, Settings → Secrets and variables → Actions → añadir permisos
-#   (por defecto GITHUB_TOKEN ya tiene permisos para escribir en GHCR).
-# Para usar otro registry (ECR, Docker Hub), sustituir el login y el prefijo de la imagen.
 name: CD
 
 on:

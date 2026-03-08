@@ -10,11 +10,10 @@ export class InventoryService {
     private readonly inventoryRepo: Repository<InventoryEntity>,
   ) {}
 
-  // Este método se ejecutará cuando llegue un mensaje de RabbitMQ
   async handleProductCreated(data: { id: string }) {
     const newInventory = this.inventoryRepo.create({
       productId: data.id,
-      quantity: 0, // Iniciamos en cero
+      quantity: 0,
     });
     return await this.inventoryRepo.save(newInventory);
   }
@@ -31,10 +30,6 @@ export class InventoryService {
     }
   }
 
-  /**
-   * Descuenta stock cuando se crea una orden (evento order_created desde order-service).
-   * Si no hay stock suficiente, descuenta hasta 0 y no lanza error (el negocio puede compensar después).
-   */
   async handleOrderCreated(data: { orderId: string; items: { productId: string; quantity: number; price?: number }[] }) {
     for (const item of data.items) {
       const inventory = await this.inventoryRepo.findOne({ where: { productId: item.productId } });

@@ -5,25 +5,21 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { InventoryEntity } from './domain/entities/inventory.entity';
 import { InventoryService } from './application/services/inventory.service';
 import { InventoryController } from './infrastructure/controllers/inventory.controller';
+import { HealthController } from './infrastructure/controllers/health.controller';
 
 @Module({
   imports: [
-    // 1. Configuración de Variables de Entorno
     ConfigModule.forRoot({ isGlobal: true }),
-
-    // 2. Conexión a la Base de Datos (inventory_db)
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
         entities: [InventoryEntity],
-        synchronize: true, // Solo para desarrollo, Alejandro
+        synchronize: true,
       }),
     }),
     TypeOrmModule.forFeature([InventoryEntity]),
-
-    // 3. Cliente de RabbitMQ (Para poder EMITIR eventos si fuera necesario)
     ClientsModule.registerAsync([
       {
         name: 'INVENTORY_SERVICE',
@@ -39,7 +35,7 @@ import { InventoryController } from './infrastructure/controllers/inventory.cont
       },
     ]),
   ],
-  controllers: [InventoryController],
+  controllers: [InventoryController, HealthController],
   providers: [InventoryService],
 })
 export class AppModule {}

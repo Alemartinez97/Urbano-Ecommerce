@@ -21,7 +21,6 @@ export class UsersController {
     return await this.usersService.create(createUserDto);
   }
 
-  /** Usado por auth-service para login: valida email+password y devuelve usuario sin password. */
   @Post('validate')
   async validateCredentials(@Body() body: ValidateCredentialsDto) {
     const user = await this.usersService.validateCredentials(body.email, body.password);
@@ -38,7 +37,6 @@ export class UsersController {
 
   @Get(':id')
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    // El ParseUUIDPipe valida que el ID sea un UUID válido antes de entrar al servicio
     return await this.usersService.findOne(id);
   }
 }

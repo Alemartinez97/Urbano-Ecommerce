@@ -1,0 +1,45 @@
+# Optional: use this to create an IAM user for GitHub Actions that can only push to ECR.
+# 1. Rename this file to iam-github-ecr.tf (remove .example)
+# 2. Run terraform apply – creates user "urbano-github-ecr" and outputs access key instructions
+# 3. Create access key in console for this user and set as GitHub secrets
+
+# resource "aws_iam_user" "github_ecr" {
+#   name = "urbano-github-ecr"
+#   path = "/"
+# }
+#
+# resource "aws_iam_user_policy" "github_ecr_ecr_push" {
+#   name   = "ecr-push"
+#   user   = aws_iam_user.github_ecr.name
+#   policy = data.aws_iam_policy_document.github_ecr_ecr_push.json
+# }
+#
+# data "aws_iam_policy_document" "github_ecr_ecr_push" {
+#   statement {
+#     sid    = "GetAuthorizationToken"
+#     effect = "Allow"
+#     actions = [
+#       "ecr:GetAuthorizationToken"
+#     ]
+#     resources = ["*"]
+#   }
+#   statement {
+#     sid    = "PushToUrbanoRepos"
+#     effect = "Allow"
+#     actions = [
+#       "ecr:BatchCheckLayerAvailability",
+#       "ecr:GetDownloadUrlForLayer",
+#       "ecr:BatchGetImage",
+#       "ecr:PutImage",
+#       "ecr:InitiateLayerUpload",
+#       "ecr:UploadLayerPart",
+#       "ecr:CompleteLayerUpload"
+#     ]
+#     resources = [for r in aws_ecr_repository.microservice : r.arn]
+#   }
+# }
+#
+# output "github_actions_iam_user" {
+#   description = "IAM user for GitHub Actions; create an access key in the console and set as GitHub secrets"
+#   value       = aws_iam_user.github_ecr.name
+# }
