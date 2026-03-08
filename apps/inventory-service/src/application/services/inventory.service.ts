@@ -10,16 +10,26 @@ export class InventoryService {
     private readonly inventoryRepo: Repository<InventoryEntity>,
   ) {}
 
-  async handleProductCreated(data: { id: string }) {
+  async handleProductCreated(data: { id: string; initialStock?: number }) {
     const newInventory = this.inventoryRepo.create({
       productId: data.id,
-      quantity: 0,
+      quantity: data.initialStock ?? 0,
     });
     return await this.inventoryRepo.save(newInventory);
   }
 
   async getStock(productId: string) {
     return await this.inventoryRepo.findOne({ where: { productId } });
+  }
+
+  async getStockBatch(productIds: string[]): Promise<{ productId: string; quantity: number }[]> {
+    if (productIds.length === 0) return [];
+    const results: { productId: string; quantity: number }[] = [];
+    for (const productId of productIds) {
+      const item = await this.inventoryRepo.findOne({ where: { productId } });
+      results.push({ productId, quantity: item?.quantity ?? 0 });
+    }
+    return results;
   }
 
   async updateStock(productId: string, quantity: number) {

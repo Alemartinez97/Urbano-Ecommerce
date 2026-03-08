@@ -23,7 +23,11 @@ async function bootstrap() {
   const corsOrigin = configService.get<string>('CORS_ORIGIN');
   app.enableCors(corsOrigin ? { origin: corsOrigin.split(',').map((o) => o.trim()) } : undefined);
 
-  const config = new DocumentBuilder().setTitle('Urbano - catalog-service').setVersion('1.0').build();
+  const config = new DocumentBuilder()
+    .setTitle('Urbano - catalog-service')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 

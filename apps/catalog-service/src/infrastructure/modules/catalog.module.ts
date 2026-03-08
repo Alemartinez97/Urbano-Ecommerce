@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { HttpModule } from '@nestjs/axios';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { ProductEntity } from '../persistence/product.entity';
@@ -14,6 +15,14 @@ import { JwtStrategy } from '../strategies/jwt.strategy';
 @Module({
   imports: [
     TypeOrmModule.forFeature([ProductEntity]),
+    HttpModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        baseURL: config.get<string>('INVENTORY_SERVICE_URL') ?? 'http://inventory-service:3004',
+        timeout: 5000,
+      }),
+    }),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

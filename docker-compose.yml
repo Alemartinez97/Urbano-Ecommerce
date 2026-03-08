@@ -86,6 +86,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@catalog-db:5432/${POSTGRES_DB_CATALOG:-catalog_db}
       EVENT_BUS_URL: ${EVENT_BUS_URL:-amqp://event-bus:5672}
+      INVENTORY_SERVICE_URL: ${INVENTORY_SERVICE_URL:-http://inventory-service:3004}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000

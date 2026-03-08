@@ -31,6 +31,7 @@ async function bootstrap() {
     .setDescription('API para la gestión de inventario y stock')
     .setVersion('1.0')
     .addTag('inventory')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);

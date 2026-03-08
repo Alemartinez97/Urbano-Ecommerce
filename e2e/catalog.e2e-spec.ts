@@ -26,7 +26,13 @@ describe('E2E Catalog', () => {
   }, 35000);
 
   it('GET /products devuelve 200 y array', async () => {
-    const res = await fetch(apiUrl(catalogUrl, '/products'));
+    const token = await getAuthToken();
+    const res = await fetch(apiUrl(catalogUrl, '/products'),{
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(Array.isArray(data)).toBe(true);

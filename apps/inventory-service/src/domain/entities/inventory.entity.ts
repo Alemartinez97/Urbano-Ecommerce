@@ -6,7 +6,7 @@ export class InventoryEntity {
   id: string;
 
   @Column()
-  productId: string; // Relación lógica con el catálogo
+  productId: string;
 
   @Column({ default: 0 })
   quantity: number;

@@ -1,7 +1,9 @@
-import { Controller, Post, Body, Get, Param, ParseUUIDPipe, UseInterceptors, ClassSerializerInterceptor, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, ParseUUIDPipe, UseInterceptors, ClassSerializerInterceptor, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { CreateUserDto } from '../../application/dtos/create-user.dto';
 import { UsersService } from '../../application/services/users.service';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 export class ValidateCredentialsDto {
   @IsEmail()
@@ -29,6 +31,8 @@ export class UsersController {
   }
 
   @Get('email/:email')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
   async findByEmail(@Param('email') email: string) {
     const user = await this.usersService.findByEmail(email);
     if (!user) return null;
@@ -36,6 +40,8 @@ export class UsersController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     return await this.usersService.findOne(id);
   }

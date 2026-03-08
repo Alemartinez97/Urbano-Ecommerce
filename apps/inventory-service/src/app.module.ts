@@ -5,6 +5,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { InventoryEntity } from './domain/entities/inventory.entity';
 import { InventoryService } from './application/services/inventory.service';
 import { InventoryController } from './infrastructure/controllers/inventory.controller';
+import { StockController } from './infrastructure/controllers/stock.controller';
 import { HealthController } from './infrastructure/controllers/health.controller';
 
 @Module({
@@ -35,7 +36,7 @@ import { HealthController } from './infrastructure/controllers/health.controller
       },
     ]),
   ],
-  controllers: [InventoryController, HealthController],
+  controllers: [InventoryController, StockController, HealthController],
   providers: [InventoryService],
 })
 export class AppModule {}

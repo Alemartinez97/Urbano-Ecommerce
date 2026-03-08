@@ -8,8 +8,9 @@ export class CreateProductDto {
   @IsNumber()
   @Min(0)
   price: number;
+  @IsOptional()
   @IsString()
-  sku: string;
+  sku?: string;
   @IsString()
   categoryId: string;
   @IsOptional()
@@ -22,5 +23,17 @@ export class CreateProductDto {
 }
   
   export interface UpdateProductDto extends Partial<CreateProductDto> {
-    id: string;
-  }
+  id: string;
+}
+
+export interface ProductWithQuantityDto {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  sku: string;
+  categoryId: string;
+  active: boolean;
+  createdAt: Date;
+  quantity: number;
+}

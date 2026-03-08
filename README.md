@@ -300,7 +300,7 @@ ecommerce-urbano/
 │   ├── CI-CD.md           # GitHub Actions workflows
 │   ├── ESTRATEGIA-AWS.md  # AWS strategy and “code ready” checklist
 │   ├── DEPLOY-AWS.md      # Full guide: ECR, ECS Fargate, ALB, RDS, Secrets Manager
-│   ├── observability-datadog.md  # Datadog APM, trace/log correlation, env vars
+│   ├── observability-datadog.md  # Datadog APM, trace/log correlation
 │   └── PLAN-MEJORAS.md           # Roadmap: Deploy, Security, Observability, Cost, Operations
 ├── infra/
 │   ├── README.md          # 5-step AWS deploy (Terraform + GitHub secrets + push)
@@ -322,14 +322,8 @@ Each service typically follows a layered structure: `application/`, `infrastruct
 | [docs/CI-CD.md](docs/CI-CD.md) | GitHub Actions workflows (CI and CD). |
 | [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md) | Full AWS deploy guide: ECR, ECS Fargate, ALB, RDS, Secrets Manager. |
 | [docs/ESTRATEGIA-AWS.md](docs/ESTRATEGIA-AWS.md) | AWS strategy and "code ready" checklist. |
-| [docs/observability-datadog.md](docs/observability-datadog.md) | Datadog APM, trace/log correlation, env vars. |
-| [docs/PLAN-MEJORAS.md](docs/PLAN-MEJORAS.md) | Improvement plan: Deploy, Security, Observability, Cost, Operations. |
-
----
-
-## Improvement plan
-
-Roadmap for **Deploy**, **Security**, **Observability**, **Cost**, and **Operations** in [docs/PLAN-MEJORAS.md](docs/PLAN-MEJORAS.md) (tasks by phase, success criteria, suggested order).
+| [docs/observability-datadog.md](docs/observability-datadog.md) | Datadog APM, trace/log correlation. |
+| [docs/PLAN-MEJORAS.md](docs/PLAN-MEJORAS.md) | Roadmap: Deploy, Security, Observability, Cost, Operations. |
 
 ---
 
