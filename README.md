@@ -19,6 +19,41 @@ The same stack (NestJS, TypeORM, PostgreSQL) is kept; JWT/Passport, Swagger, env
 
 ---
 
+## 1. Diagnóstico de la arquitectura actual (monolito)
+
+Razones por las que se migró desde el monolito [nestjs-ecommerce](https://github.com/hsn656/nestjs-ecommerce).
+
+### Problemas de acoplamiento
+
+- **Binario y de memoria:** Al compartir el mismo proceso de Node.js, un leak de memoria en el procesamiento de imágenes del Catálogo tira abajo el flujo de Auth y Órdenes.
+- **Base de datos compartida:** El esquema de tablas está entrelazado. Si modificás la tabla de Users para agregar un campo de auditoría, podrías romper accidentalmente la relación con Orders sin previo aviso.
+
+### Límites de dominio poco claros
+
+- **Lógica difusa:** La lógica de "Stock" vive a veces en el controlador de productos y otras en el de ventas. No hay un "dueño" del inventario.
+- **Entidades "Dios":** El objeto User termina cargando con perfiles, direcciones, métodos de pago e historial, volviéndose inmanejable y pesado de consultar.
+
+### Riesgos de escalabilidad
+
+- **Escalado todo-o-nada:** No podés escalar solo el proceso de pagos (que requiere alta CPU para cifrado) sin replicar también el catálogo (que requiere mucha RAM). Estás desperdiciando dinero en infraestructura.
+- **Bloqueo de I/O:** Un proceso pesado (ej. generar un reporte de ventas) bloquea el Event Loop de Node.js para todos los usuarios, afectando incluso el login.
+
+### Problemas organizacionales implícitos
+
+- **Cuello de botella en el deploy:** Si el equipo de Frontend necesita un cambio mínimo en el Catálogo, tiene que esperar a que se testee todo el sistema de Órdenes para poder desplegar el monolito.
+- **Fricción de código:** Varios desarrolladores tocando el mismo `app.module.ts` genera conflictos de merge (git) constantes.
+
+---
+
+## 2. Propuesta: arquitectura objetivo (microservicios)
+
+### Desacoplamiento de responsabilidades
+
+- Se divide el sistema en **5 Bounded Contexts:** Catalog, Users, Auth, Inventory, Order. Cada uno con su propia base de datos y despliegue independiente.
+- **Comunicación event-driven:** Se usa RabbitMQ para que los servicios no se "conozcan". Si el servicio de Inventario está caído, el de Órdenes simplemente encola el mensaje y sigue operando. Consistencia eventual.
+
+---
+
 ## Architecture
 
 ```
@@ -197,35 +232,65 @@ In production: use a secrets manager (AWS Secrets Manager, Vault, etc.) and disa
 
 ---
 
-## AWS deployment
+## Arquitectura en AWS
 
-The **code is ready** for AWS (Dockerfiles, health checks, env-based config, CD to ECR). This repo only documents the **strategy**; it does not include infrastructure code (Terraform/CloudFormation). Summary:
+El código está listo para AWS (Dockerfiles, health checks, configuración por variables de entorno, CD a ECR). Este repo documenta la **estrategia**; la infraestructura (Terraform/CloudFormation) se provisiona por separado.
 
-- Each service has a **Dockerfile** and runs as a container.
-- All configuration is via **environment variables** (no hardcoded URLs or secrets).
-- Communication between services is **HTTP** and **messaging (RabbitMQ)**.
+### Mapeo de la arquitectura a servicios AWS
 
-**Deploy in 5 steps:** Terraform in `infra/terraform/` creates ECR repos; then set GitHub secrets and push to `main`. See **[infra/README.md](infra/README.md)**. Full guide: [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md). Strategy: [docs/ESTRATEGIA-AWS.md](docs/ESTRATEGIA-AWS.md).
+| Componente | Uso en el proyecto | Servicio AWS | Justificación breve |
+|------------|-------------------|--------------|----------------------|
+| **Contenedores** | Una imagen por microservicio | **Amazon ECS (Fargate)** o **EKS** | ECS Fargate evita gestionar servidores; EKS da más control y portabilidad (Kubernetes). |
+| **Registro de imágenes** | Build desde cada `apps/*/Dockerfile` | **Amazon ECR** | Integrado con ECS/EKS; escaneo de vulnerabilidades en push; el CD del repo ya sube imágenes. |
+| **Bases de datos** | 4 PostgreSQL (catalog, users, orders, inventory) | **Amazon RDS** o **Aurora PostgreSQL** | Un RDS con 4 bases reduce coste; Aurora aporta mejor disponibilidad y escalado si crece la carga. |
+| **Bus de eventos** | RabbitMQ | **Amazon MQ (RabbitMQ)** | Compatible con el código actual (`EVENT_BUS_URL`); alternativa: SQS/SNS con cambios en la aplicación. |
+| **Secretos** | JWT, cadenas de conexión | **Secrets Manager** o **Parameter Store** | Parameter Store (estándar) tiene capa gratuita; Secrets Manager rotación automática. |
+| **Entrada de tráfico** | Múltiples puertos (3001–3005) | **Application Load Balancer (ALB)** | Enrutado por path (`/api/catalog*` → catalog-service); HTTPS con certificado ACM. |
+| **DNS** | Opcional | **Route 53** | Dominios propios y health checks para failover. |
 
-### Recommended AWS components
+### Deploy
 
-| Component | Project usage | AWS option |
-|-----------|----------------|------------|
-| **Containers** | One image per microservice | **Amazon ECS (Fargate)** or EKS |
-| **Image registry** | Build from each `apps/*/Dockerfile` | **Amazon ECR** (one repo per service or per app) |
-| **Databases** | 4 PostgreSQL (catalog, users, orders, inventory) | **Amazon RDS** (one instance with 4 DBs) or **Aurora PostgreSQL** |
-| **Event bus** | RabbitMQ in Docker | **Amazon MQ (RabbitMQ)** or **SQS/SNS** (would require code changes) |
-| **Secrets** | `JWT_SECRET`, connection strings | **AWS Secrets Manager** or **Systems Manager Parameter Store** |
-| **Ingress** | Multiple ports (3001–3005) | **Application Load Balancer (ALB)** with path or subdomain rules |
-| **DNS** | N/A | **Route 53** (optional) |
+- **Pasos rápidos:** Terraform en `infra/terraform/` crea los repos ECR; configurás los secrets de GitHub y hacés push a `main`. Ver **[infra/README.md](infra/README.md)**.
+- **Guía completa:** [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md) (ECR, ECS Fargate, ALB, RDS, Secrets Manager).
+- **Estrategia y checklist:** [docs/ESTRATEGIA-AWS.md](docs/ESTRATEGIA-AWS.md).
 
-### Typical AWS deployment flow
+Flujo típico: (1) Build y push de imágenes a ECR (GitHub Actions), (2) VPC, subnets, security groups, (3) RDS con 4 bases y Amazon MQ, (4) ECS: cluster, task definitions con imagen ECR y variables desde Secrets Manager, (5) ALB con reglas por path y HTTPS (ACM).
 
-1. **Build and push images** to ECR (e.g. via GitHub Actions or AWS CodeBuild).
-2. **Infrastructure:** VPC, subnets, security groups; RDS (or Aurora) with 4 databases; Amazon MQ for RabbitMQ; ECR for images.
-3. **ECS:** Cluster (Fargate); task definitions per service with ECR image, env vars and secrets (from Secrets Manager); services with health checks on `/api` or a dedicated endpoint.
-4. **Network:** ALB with HTTPS (ACM certificate); path rules (e.g. `/api/catalog*` → catalog-service); target groups and ECS service registration.
-5. **Service communication:** `USERS_SERVICE_URL` points to users-service (ALB internal URL or service discovery); `DATABASE_URL` and `EVENT_BUS_URL` from RDS and Amazon MQ in the VPC.
+### Seguridad
+
+- **En la aplicación:** Helmet, CORS, JWT en rutas protegidas, rate limiting en login (ver sección [Security](#security)).
+- **En AWS:** VPC y subnets (públicas/privadas) para aislar tráfico; security groups que solo permitan el puerto del ALB hacia ECS y ECS hacia RDS/MQ; secretos en Secrets Manager o Parameter Store, nunca en el código; en producción, desactivar `synchronize` de TypeORM y usar migraciones.
+
+### Observabilidad
+
+- **Hoy:** Cada servicio expone `GET /api/health`; logs estructurados (JSON en producción) para CloudWatch, Loki o Datadog. Ver [docs/observability-datadog.md](docs/observability-datadog.md) para APM y correlación trace/log.
+- **En AWS:** CloudWatch Logs para agregar logs; CloudWatch Metrics y alarmas para CPU/memoria y health; opcional X-Ray o Datadog para trazas entre servicios.
+
+### Costos
+
+- **Opciones amigables al free tier:** EC2 t2.micro, RDS db.t3.micro, Parameter Store (estándar), ECR (500 MB/mes gratis 12 meses). ECS Fargate y ALB no están en free tier.
+- **Buenas prácticas:** Política de ciclo de vida en ECR (p. ej. últimas 15 imágenes por repo); revisar uso de ECS/RDS/ALB de forma periódica.
+
+### Operación
+
+- **Local / un solo host:** Docker Compose con `docker-compose up -d` o `npm run infrastructure:up`.
+- **En producción (recomendado):** Runbooks para incidentes frecuentes (BD caída, RabbitMQ lleno); procedimiento de backup y restore para RDS; definir quién hace rollback y cómo (nuevas imágenes en ECR, actualizar task definition).
+
+### Opción: Orquestación con Kubernetes (Amazon EKS)
+
+Pasar de contenedores aislados a un clúster gestionado permite que la infraestructura sea más "inteligente":
+
+- **Auto-healing:** Si un pod de catalog-service falla, Kubernetes lo detecta y lo levanta en segundos en otro nodo sano.
+- **Escalado horizontal (HPA):** Si el uso de CPU del microservicio de orders supera un umbral (p. ej. 70%), Kubernetes puede levantar más réplicas automáticamente.
+- **Abstracción de infraestructura:** Los manifiestos YAML permiten mover los microservicios entre nubes o entornos híbridos sin cambiar la lógica del despliegue.
+
+### Opción: Persistencia NoSQL con Amazon DynamoDB
+
+Sustituir o complementar PostgreSQL con DynamoDB en servicios de alta demanda (p. ej. Catalog o Inventory) puede mejorar rendimiento y escalado:
+
+- **Latencia estable:** Respuesta en milisegundos de un solo dígito, sin degradación por volumen de datos (a diferencia de JOINs complejos en SQL).
+- **Escalado serverless:** No hay que dimensionar disco ni RAM; DynamoDB escala RCU/WCU bajo demanda.
+- **Modelo flexible:** Útil para catálogos donde un producto tiene "talle" y otro "resolución"; atributos distintos sin migraciones de esquema costosas.
 
 ---
 
