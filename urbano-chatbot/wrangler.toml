@@ -1,0 +1,12 @@
+name = "premium-ai-chatbot"
+compatibility_date = "2024-05-02"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".next"
+
+[vars]
+NODE_ENV = "production"
+# Puedes añadir variables de entorno globales de Cloudflare aquí si no utilizas claves de OpenAI dinámicas
+# OPENAI_API_KEY = "sk-proj-..."
+
+[env.production]
+vars = { NODE_ENV = "production" }

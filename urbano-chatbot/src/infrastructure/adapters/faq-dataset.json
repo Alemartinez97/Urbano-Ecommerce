@@ -1,0 +1,37 @@
+[
+  {
+    "id": "kb-1",
+    "question": "Qué es este Chatbot y cuáles son sus características principales?",
+    "answer": "Este es un Chatbot Asistente Virtual de última generación. Sus características principales son: (1) Arquitectura Hexagonal y Limpia totalmente desacoplada, (2) Orquestación agéntica autónoma, (3) Soporte nativo de Text-to-Speech (síntesis de voz) y Speech-to-Text (entrada por micrófono), (4) Persistencia local de conversaciones con auto-titulado inteligente, y (5) Modo resiliente e independiente (funciona al 100% incluso en entornos offline)."
+  },
+  {
+    "id": "kb-2",
+    "question": "Cómo funciona la síntesis de voz (Text to Speech)?",
+    "answer": "El asistente posee un reproductor de audio integrado que utiliza la SpeechSynthesis API nativa del navegador. Esto te permite escuchar las respuestas en voz alta de manera totalmente gratuita y sin necesidad de consumir APIs externas ni keys adicionales de la nube."
+  },
+  {
+    "id": "kb-3",
+    "question": "Cómo puedo utilizar la entrada por voz (Speech to Text)?",
+    "answer": "Puedes hacer clic en el ícono de micrófono ubicado a la derecha de la barra de escritura. Al activarlo, verás una animación de onda de frecuencia. Empieza a hablar y tu navegador transcribirá la voz a texto directamente en tiempo real dentro del campo de entrada de chat."
+  },
+  {
+    "id": "kb-4",
+    "question": "Qué base de datos utiliza para persistir las conversaciones?",
+    "answer": "Por defecto, utiliza el almacenamiento local (localStorage) del navegador de manera persistente. Esto significa que las conversaciones se guardan en tu dispositivo local de forma segura y privada. Próximamente se podrá habilitar un adaptador cloud de base de datos como Firebase Firestore."
+  },
+  {
+    "id": "kb-5",
+    "question": "Cuál es la política general de reembolsos y soporte técnico?",
+    "answer": "Nuestra política permite solicitar soporte técnico o aclaraciones en cualquier momento. Si necesitas resolver una duda compleja o un reclamo de servicio, el chatbot te derivará de forma autónoma con un operador humano en vivo (Mateo de Soporte) mediante la herramienta de derivación integrada."
+  },
+  {
+    "id": "kb-6",
+    "question": "Es compatible con despliegues en el Edge de Cloudflare?",
+    "answer": "Sí, el proyecto está completamente preparado para correr sobre infraestructuras serverless y edge. Incluye configuraciones de wrangler.toml para ser desplegado en Cloudflare Workers y Pages, y los controladores del API de streaming son compatibles con el Edge Runtime."
+  },
+  {
+    "id": "kb-7",
+    "question": "Cómo se integra este chatbot con otros microservicios más adelante?",
+    "answer": "Gracias al diseño de arquitectura hexagonal desacoplada, la integración con otros servicios backend se realiza a través de interfaces en la carpeta 'src/domain/interfaces'. Para integrarlo con bases de datos o servicios externos en el futuro, solo debes implementar un nuevo adaptador en 'src/infrastructure/adapters' que consuma tus APIs HTTP o gRPC reales."
+  }
+]
