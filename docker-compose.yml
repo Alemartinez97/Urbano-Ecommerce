@@ -97,7 +97,7 @@ services:
     ports:
       - "3001:3000"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -124,7 +124,7 @@ services:
     ports:
       - "3002:3000"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -143,6 +143,9 @@ services:
       PORT: 3003
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       USERS_SERVICE_URL: ${USERS_SERVICE_URL:-http://users-service:3000}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:3003/api/v1/auth/google/callback}
       NODE_ENV: ${NODE_ENV:-development}
       DD_SERVICE: auth-service
       DD_ENV: ${DD_ENV:-development}
@@ -151,7 +154,7 @@ services:
     ports:
       - "3003:3003"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3003/api/health"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3003/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -215,3 +218,26 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  urbano-chatbot:
+    build:
+      context: .
+      dockerfile: urbano-chatbot/Dockerfile
+    container_name: urbano-chatbot
+    restart: always
+    depends_on:
+      catalog-service:
+        condition: service_started
+      inventory-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog-service:3000}
+      INVENTORY_SERVICE_URL: ${INVENTORY_SERVICE_URL:-http://inventory-service:3004}
+      ORDER_SERVICE_URL: ${ORDER_SERVICE_URL:-http://order-service:3005}
+    ports:
+      - "4000:3000"

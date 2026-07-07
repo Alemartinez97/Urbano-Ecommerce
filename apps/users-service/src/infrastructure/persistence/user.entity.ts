@@ -1,5 +1,6 @@
 import { Exclude } from 'class-transformer';
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne } from 'typeorm';
+import { ProviderProfileEntity } from './provider-profile.entity';
 
 @Entity('users')
 export class UserEntity {
@@ -9,9 +10,12 @@ export class UserEntity {
   @Column({ unique: true })
   email: string;
 
+  @Column({ unique: true, nullable: true })
+  googleId: string;
+
   @Exclude()
-  @Column({ select: false }) // Por seguridad, no se incluye en consultas automáticas
-  password: string;
+  @Column({ select: false, nullable: true }) // Nullable because of Google OAuth
+  password?: string;
 
   @Column()
   firstName: string;
@@ -19,9 +23,13 @@ export class UserEntity {
   @Column()
   lastName: string;
 
-  @Column({ default: 'customer' }) // 'customer' o 'admin'
+  @Column({ default: 'CUSTOMER' }) // 'CUSTOMER', 'PROVIDER' o 'ADMIN'
   role: string;
 
   @CreateDateColumn()
   createdAt: Date;
+
+  // Relación con el perfil de proveedor (Solo tendrá datos si el rol es PROVIDER)
+  @OneToOne(() => ProviderProfileEntity, profile => profile.user, { cascade: true, nullable: true })
+  providerProfile: ProviderProfileEntity;
 }

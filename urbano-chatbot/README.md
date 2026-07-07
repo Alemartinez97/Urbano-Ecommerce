@@ -1,5 +1,8 @@
 # 🤖 Premium AI Chatbot — Microservicio Conversacional Autónomo
 
+**Demo en Vivo (Vercel):** [https://chat-bot-sable-two.vercel.app/](https://chat-bot-sable-two.vercel.app/)  
+**Repositorio GitHub:** [https://github.com/Alemartinez97/Chat-bot](https://github.com/Alemartinez97/Chat-bot)  
+
 ¡Bienvenido al repositorio del **Asistente Virtual Inteligente y Agéntico**! 
 
 Este proyecto es una aplicación full-stack moderna y ultra-premium desarrollada como un microservicio completamente independiente con **Next.js (App Router)**, **TypeScript**, **Tailwind CSS v4** y **Vercel AI SDK**, lista para ser dockerizada y desplegada en infraestructuras cloud y en el edge (como **Cloudflare** o **Vercel**), diseñada bajo los principios de la **Arquitectura Limpia y Hexagonal**.

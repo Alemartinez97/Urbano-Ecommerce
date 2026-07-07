@@ -13,6 +13,7 @@ export default function HomePage() {
   const [activeSessionId, setActiveSessionId] = useState<string>("");
   const [isClient, setIsClient] = useState(false);
   const [input, setInput] = useState("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const { 
     messages, 
@@ -219,13 +220,29 @@ export default function HomePage() {
   }
 
   return (
-    <main className="w-screen h-screen flex overflow-hidden bg-gray-950 text-gray-200">
+    <main className="w-screen h-screen flex overflow-hidden bg-gray-950 text-gray-200 relative">
+      {/* Sidebar backdrop for mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-35 md:hidden transition-opacity duration-300 animate-fade-in"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       <ChatSidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
-        onSelectSession={handleSelectSession}
-        onNewSession={handleNewSession}
+        onSelectSession={(id) => {
+          handleSelectSession(id);
+          setIsSidebarOpen(false);
+        }}
+        onNewSession={() => {
+          handleNewSession();
+          setIsSidebarOpen(false);
+        }}
         onDeleteSession={handleDeleteSession}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
       <ChatWindow
         messages={mappedMessages}
@@ -237,6 +254,8 @@ export default function HomePage() {
         setMessages={setMessages}
         setInput={setInput}
         onNewSession={handleNewSession}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        isSidebarOpen={isSidebarOpen}
       />
     </main>
   );

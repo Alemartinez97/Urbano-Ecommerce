@@ -1,7 +1,8 @@
-import { ProductEntity } from '../../infrastructure/persistence/product.entity';
+import { EventServiceEntity } from '../../infrastructure/persistence/product.entity';
 
+// Interfaz del repositorio actualizada para EventGo (antes manejaba ProductEntity)
 export interface ProductRepository {
-  save(product: Partial<ProductEntity>): Promise<ProductEntity>;
-  findOne(id: string): Promise<ProductEntity | null>;
-  findAll(): Promise<ProductEntity[]>;
+  save(service: Partial<EventServiceEntity>): Promise<EventServiceEntity>;
+  findOne(id: string): Promise<EventServiceEntity | null>;
+  findAll(): Promise<EventServiceEntity[]>;
 }

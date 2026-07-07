@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -12,7 +12,6 @@ async function bootstrap() {
   const port = configService.get<number>('PORT') ?? 3001;
 
   app.use(helmet());
-  app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -20,18 +19,25 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Prefijo global y versionado URI: todas las rutas serán /api/v{n}/...
+  app.setGlobalPrefix('api');
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+
   const corsOrigin = configService.get<string>('CORS_ORIGIN');
   app.enableCors(corsOrigin ? { origin: corsOrigin.split(',').map((o) => o.trim()) } : undefined);
 
+  // Documentación Swagger disponible en /api/v1/docs
   const config = new DocumentBuilder()
-    .setTitle('Urbano - catalog-service')
+    .setTitle('EventGo - catalog-service')
+    .setDescription('Marketplace de servicios profesionales para eventos (Catering, Música, Personal, etc.)')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api/v1/docs', app, document);
 
   await app.listen(port);
-  logger.log(`Application listening on http://localhost:${port}/api`, 'Bootstrap', { port });
+  logger.log(`Application listening on http://localhost:${port}/api/v1`, 'Bootstrap', { port });
 }
 bootstrap();

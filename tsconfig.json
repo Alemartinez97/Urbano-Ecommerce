@@ -22,5 +22,6 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {}
-  }
+  },
+  "exclude": ["node_modules", "dist", "urbano-chatbot", "expo-app"]
 }

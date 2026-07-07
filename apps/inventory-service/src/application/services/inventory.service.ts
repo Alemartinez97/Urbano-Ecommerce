@@ -1,53 +1,97 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { InventoryEntity } from '../../domain/entities/inventory.entity';
+import { Repository, LessThan, MoreThan, Not } from 'typeorm';
+import { TimeSlotEntity, SlotStatus } from '../../domain/entities/inventory.entity';
 
 @Injectable()
-export class InventoryService {
+export class AvailabilityService {
+  private readonly logger = new Logger(AvailabilityService.name);
+
   constructor(
-    @InjectRepository(InventoryEntity)
-    private readonly inventoryRepo: Repository<InventoryEntity>,
+    @InjectRepository(TimeSlotEntity)
+    private readonly slotRepo: Repository<TimeSlotEntity>,
   ) {}
 
-  async handleProductCreated(data: { id: string; initialStock?: number }) {
-    const newInventory = this.inventoryRepo.create({
-      productId: data.id,
-      quantity: data.initialStock ?? 0,
+  // Verifica si un proveedor tiene algún slot que se solape con el rango pedido
+  // Esta es la lógica crítica: impide que un mozo acepte dos eventos al mismo tiempo
+  async hasOverlap(providerId: string, startTime: Date, endTime: Date, excludeBookingId?: string): Promise<boolean> {
+    const query = this.slotRepo.createQueryBuilder('slot')
+      .where('slot.providerId = :providerId', { providerId })
+      .andWhere('slot.status != :status', { status: SlotStatus.AVAILABLE })
+      .andWhere('slot.startTime < :endTime', { endTime })
+      .andWhere('slot.endTime > :startTime', { startTime });
+
+    // Al editar una reserva, excluimos el booking propio para no colisionar consigo mismo
+    if (excludeBookingId) {
+      query.andWhere('slot.bookingId != :bookingId', { bookingId: excludeBookingId });
+    }
+
+    const count = await query.getCount();
+    return count > 0;
+  }
+
+  // Consulta rápida de disponibilidad: el catalog-service llama esto antes de mostrar al proveedor
+  async isAvailable(providerId: string, startTime: Date, endTime: Date): Promise<boolean> {
+    const overlap = await this.hasOverlap(providerId, startTime, endTime);
+    return !overlap;
+  }
+
+  // Bloquea un slot cuando una reserva es confirmada
+  // Lo llama el order-service via RabbitMQ cuando el cliente paga
+  async bookSlot(data: { providerId: string; serviceId: string; bookingId: string; startTime: Date; endTime: Date }): Promise<TimeSlotEntity> {
+    // Verificación final anti-colisión antes de confirmar
+    const hasConflict = await this.hasOverlap(data.providerId, data.startTime, data.endTime);
+    if (hasConflict) {
+      throw new ConflictException(`El proveedor no está disponible en ese horario`);
+    }
+
+    const slot = this.slotRepo.create({
+      providerId: data.providerId,
+      serviceId: data.serviceId,
+      bookingId: data.bookingId,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      status: SlotStatus.BOOKED,
     });
-    return await this.inventoryRepo.save(newInventory);
+
+    this.logger.log(`Slot bloqueado: Proveedor ${data.providerId} de ${data.startTime} a ${data.endTime}`);
+    return await this.slotRepo.save(slot);
   }
 
-  async getStock(productId: string) {
-    return await this.inventoryRepo.findOne({ where: { productId } });
-  }
-
-  async getStockBatch(productIds: string[]): Promise<{ productId: string; quantity: number }[]> {
-    if (productIds.length === 0) return [];
-    const results: { productId: string; quantity: number }[] = [];
-    for (const productId of productIds) {
-      const item = await this.inventoryRepo.findOne({ where: { productId } });
-      results.push({ productId, quantity: item?.quantity ?? 0 });
+  // El proveedor bloquea manualmente días o franjas en su agenda (vacaciones, descanso)
+  async blockSlot(providerId: string, startTime: Date, endTime: Date): Promise<TimeSlotEntity> {
+    const hasConflict = await this.hasOverlap(providerId, startTime, endTime);
+    if (hasConflict) {
+      throw new ConflictException('Ya tienes una actividad en ese rango horario');
     }
-    return results;
+
+    const slot = this.slotRepo.create({
+      providerId,
+      startTime,
+      endTime,
+      status: SlotStatus.BLOCKED,
+    });
+    return await this.slotRepo.save(slot);
   }
 
-  async updateStock(productId: string, quantity: number) {
-    const item = await this.inventoryRepo.findOne({ where: { productId } });
-    if (item) {
-      item.quantity = quantity;
-      return await this.inventoryRepo.save(item);
+  // Libera un slot cuando una reserva es cancelada
+  // El proveedor queda libre para aceptar otro evento en ese horario
+  async releaseSlot(bookingId: string): Promise<void> {
+    const slot = await this.slotRepo.findOne({ where: { bookingId } });
+    if (slot) {
+      await this.slotRepo.remove(slot);
+      this.logger.log(`Slot liberado para la reserva: ${bookingId}`);
     }
   }
 
-  async handleOrderCreated(data: { orderId: string; items: { productId: string; quantity: number; price?: number }[] }) {
-    for (const item of data.items) {
-      const inventory = await this.inventoryRepo.findOne({ where: { productId: item.productId } });
-      if (inventory) {
-        const newQuantity = Math.max(0, inventory.quantity - item.quantity);
-        inventory.quantity = newQuantity;
-        await this.inventoryRepo.save(inventory);
-      }
-    }
+  // Devuelve todos los slots (ocupados y bloqueados) de un proveedor para un rango de fechas
+  // El proveedor lo ve en su "agenda" del panel de gestión
+  async getProviderSchedule(providerId: string, from: Date, to: Date): Promise<TimeSlotEntity[]> {
+    return this.slotRepo.createQueryBuilder('slot')
+      .where('slot.providerId = :providerId', { providerId })
+      .andWhere('slot.startTime >= :from', { from })
+      .andWhere('slot.endTime <= :to', { to })
+      .orderBy('slot.startTime', 'ASC')
+      .getMany();
   }
 }

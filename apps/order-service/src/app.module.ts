@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { OrderModule } from './infrastructure/modules/order.module';
-import { OrderEntity } from './infrastructure/adapters/persistence/order.entity';
+import { BookingModule } from './infrastructure/modules/booking.module';
+import { BookingEntity } from './infrastructure/adapters/persistence/booking.entity';
+import { HealthController } from './infrastructure/controllers/health.controller';
 
 @Module({
   imports: [
@@ -12,11 +13,12 @@ import { OrderEntity } from './infrastructure/adapters/persistence/order.entity'
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('ORDERS_DATABASE_URL'),
-        entities: [OrderEntity],
-        synchronize: true,
+        entities: [BookingEntity],
+        synchronize: true, // Automático en desarrollo
       }),
     }),
-    OrderModule,
+    BookingModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

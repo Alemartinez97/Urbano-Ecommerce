@@ -1,18 +1,19 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { HttpModule } from '@nestjs/axios';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { OrderService } from '../../application/services/order.service';
-import { OrderController } from '../controllers/order.controller';
-import { HealthController } from '../controllers/health.controller';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { OrderEntity } from '../adapters/persistence/order.entity';
+import { BookingEntity } from '../adapters/persistence/booking.entity';
+import { BookingController } from '../controllers/booking.controller';
+import { BookingService } from '../../application/services/booking.service';
 import { JwtStrategy } from '../strategies/jwt.strategy';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([OrderEntity]),
+    TypeOrmModule.forFeature([BookingEntity]),
+    HttpModule.register({ timeout: 5000 }), // Para llamar al availability-service
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -25,20 +26,21 @@ import { JwtStrategy } from '../strategies/jwt.strategy';
     ClientsModule.registerAsync([
       {
         name: 'ORDER_EVENT_BUS',
+        imports: [ConfigModule],
         inject: [ConfigService],
         useFactory: (config: ConfigService) => ({
           transport: Transport.RMQ,
           options: {
             urls: [config.get<string>('EVENT_BUS_URL') || 'amqp://event-bus:5672'],
-            queue: 'inventory_queue', // Enviamos a la cola de Inventario
+            queue: 'inventory_queue', // Mismo queue que usa el availability-service
             queueOptions: { durable: false },
           },
         }),
       },
     ]),
   ],
-  controllers: [OrderController, HealthController],
-  providers: [OrderService, JwtStrategy],
-  exports: [OrderService], // Por si otro módulo interno lo necesita
+  controllers: [BookingController],
+  providers: [BookingService, JwtStrategy],
+  exports: [BookingService],
 })
-export class OrderModule {}
+export class BookingModule {}

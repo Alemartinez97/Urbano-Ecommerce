@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Plus, MessageSquare, Trash2, ShieldAlert, Sparkles } from "lucide-react";
+import { Plus, MessageSquare, Trash2, ShieldAlert, Sparkles, X } from "lucide-react";
 import { ChatSession } from "@/domain/entities/chat.entity";
+import { cn } from "@/lib/utils";
 
 interface ChatSidebarProps {
   sessions: ChatSession[];
@@ -8,6 +9,8 @@ interface ChatSidebarProps {
   onSelectSession: (id: string) => void;
   onNewSession: () => void;
   onDeleteSession: (id: string) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export function ChatSidebar({
@@ -15,10 +18,15 @@ export function ChatSidebar({
   activeSessionId,
   onSelectSession,
   onNewSession,
-  onDeleteSession
+  onDeleteSession,
+  isOpen = false,
+  onClose
 }: ChatSidebarProps) {
   return (
-    <div className="w-80 h-full border-r border-white/10 glass-panel flex flex-col z-20 transition-all duration-300">
+    <div className={cn(
+      "fixed inset-y-0 left-0 w-72 md:relative md:w-80 h-full border-r border-white/10 glass-panel flex flex-col z-40 md:z-20 transition-transform duration-300 md:translate-x-0",
+      isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+    )}>
       {/* Cabecera / Identidad */}
       <div className="p-5 border-b border-white/5 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -33,6 +41,17 @@ export function ChatSidebar({
             </span>
           </div>
         </div>
+
+        {/* Botón Cerrar (Solo en Mobile) */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 md:hidden transition-all cursor-pointer"
+            title="Cerrar menú"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Botón de Nueva Conversación */}

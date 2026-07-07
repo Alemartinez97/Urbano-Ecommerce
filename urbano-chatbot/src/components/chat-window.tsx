@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Send, Sparkles, User, Bot, Loader2,
   AlertCircle, ArrowLeft, HelpCircle, PhoneCall,
-  Mic, MicOff, Activity, X, Trash2, ChevronRight
+  Mic, MicOff, Activity, X, Trash2, ChevronRight, Menu
 } from "lucide-react";
 import { VoicePlayer } from "./voice-player";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,8 @@ interface ChatWindowProps {
   setMessages: (messages: any[] | ((prev: any[]) => any[])) => void;
   setInput: (value: string) => void;
   onNewSession: () => void;
+  onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
 }
 
 export function ChatWindow({
@@ -40,7 +42,9 @@ export function ChatWindow({
   append,
   setMessages,
   setInput,
-  onNewSession
+  onNewSession,
+  onToggleSidebar,
+  isSidebarOpen = false
 }: ChatWindowProps) {
   const [isHumanMode, setIsHumanMode] = useState(false);
   const [isHumanTyping, setIsHumanTyping] = useState(false);
@@ -357,8 +361,20 @@ export function ChatWindow({
       {/* Main Chat Flow Section */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Chat Window Sub-header */}
-        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0 glass-panel z-10">
-          <div className="flex items-center gap-3">
+        <div className="px-4 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0 glass-panel z-10">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Hamburger menu button for mobile */}
+            {onToggleSidebar && (
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                className="p-1.5 -ml-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 md:hidden transition-all cursor-pointer"
+                title="Abrir menú"
+              >
+                <Menu className="w-4.5 h-4.5" />
+              </button>
+            )}
+
             {isHumanMode ? (
               <>
                 <button
@@ -369,20 +385,20 @@ export function ChatWindow({
                   <ArrowLeft className="w-4 h-4" />
                 </button>
                 <div>
-                  <h2 className="font-bold text-sm text-emerald-400 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <h2 className="font-bold text-xs sm:text-sm text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-emerald-500 animate-pulse" />
                     Soporte Técnico (Simulación)
                   </h2>
-                  <span className="text-[10px] text-gray-500">Operador: Mateo Conectado</span>
+                  <span className="text-[9px] sm:text-[10px] text-gray-500">Operador: Mateo Conectado</span>
                 </div>
               </>
             ) : (
               <div>
-                <h2 className="font-bold text-sm text-white flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                <h2 className="font-bold text-xs sm:text-sm text-white flex items-center gap-1.5">
+                  <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-indigo-500 animate-pulse" />
                   Asistente AI Autónomo
                 </h2>
-                <span className="text-[10px] text-gray-500">Buscador semántico RAG & Vector DB</span>
+                <span className="text-[9px] sm:text-[10px] text-gray-500">Buscador semántico RAG & Vector DB</span>
               </div>
             )}
           </div>
@@ -397,7 +413,8 @@ export function ChatWindow({
             )}
           >
             <Activity className="w-3.5 h-3.5" />
-            {showLogs ? "Cerrar Consola" : "Ver Consola"}
+            <span className="hidden sm:inline">{showLogs ? "Cerrar Consola" : "Ver Consola"}</span>
+            <span className="sm:hidden">{showLogs ? "Consola" : "Ver"}</span>
           </button>
         </div>
 
@@ -621,11 +638,19 @@ export function ChatWindow({
         </div>
       </div>
 
+      {/* Observability Panel Backdrop for mobile */}
+      {showLogs && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-35 md:hidden transition-opacity duration-300 animate-fade-in"
+          onClick={() => setShowLogs(false)}
+        />
+      )}
+
       {/* Observability Panel Drawer */}
       <div
         className={cn(
-          "h-full flex flex-col border-l border-white/5 bg-gray-950/80 backdrop-blur-xl transition-all duration-300 overflow-hidden",
-          showLogs ? "w-80 opacity-100" : "w-0 opacity-0"
+          "fixed inset-y-0 right-0 w-72 md:relative md:w-80 h-full flex flex-col border-l border-white/5 bg-gray-950/80 backdrop-blur-xl transition-all duration-300 overflow-hidden z-40 md:z-20",
+          showLogs ? "translate-x-0 md:w-80 opacity-100" : "translate-x-full md:w-0 md:translate-x-0 opacity-0 pointer-events-none md:pointer-events-auto"
         )}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 shrink-0">

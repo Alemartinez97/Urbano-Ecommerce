@@ -8,15 +8,18 @@ import { AuthService } from '../../application/services/auth.service';
 import { AuthController } from '../controllers/auth.controller';
 import { HealthController } from '../controllers/health.controller';
 import { JwtStrategy } from '../strategies/jwt.strategy';
+import { GoogleStrategy } from '../strategies/google.strategy';
 
 @Module({
   imports: [
-    HttpModule,
+    HttpModule, // Para hacer peticiones al users-service
     PassportModule,
+    // Protección contra ataques de fuerza bruta
     ThrottlerModule.forRoot([
-      { name: 'short', ttl: 1000, limit: 3 },   // 3 requests per second
-      { name: 'medium', ttl: 10000, limit: 20 }, // 20 per 10s
+      { name: 'short', ttl: 1000, limit: 3 },   // 3 peticiones por segundo
+      { name: 'medium', ttl: 10000, limit: 20 }, // 20 peticiones por 10s
     ]),
+    // Configuración del token JWT
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -27,7 +30,11 @@ import { JwtStrategy } from '../strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController, HealthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [
+    AuthService, 
+    JwtStrategy, // Estrategia para proteger endpoints con JWT
+    GoogleStrategy // Estrategia para el login con Google OAuth
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

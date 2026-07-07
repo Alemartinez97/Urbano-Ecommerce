@@ -2,29 +2,29 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProductRepository } from '../../../application/repositories/product.repository.interface';
-import { ProductEntity } from '../../persistence/product.entity';
+import { EventServiceEntity } from '../../persistence/product.entity';
 
+// Adapter de TypeORM actualizado para manejar servicios de eventos (antes era ProductEntity)
 @Injectable()
 export class TypeOrmProductRepository implements ProductRepository {
   constructor(
-    @InjectRepository(ProductEntity)
-    private readonly repository: Repository<ProductEntity>,
+    @InjectRepository(EventServiceEntity)
+    private readonly repository: Repository<EventServiceEntity>,
   ) {}
 
-  async save(product: Partial<ProductEntity>): Promise<ProductEntity> {
-    const entity = this.repository.create(product);
+  async save(service: Partial<EventServiceEntity>): Promise<EventServiceEntity> {
+    const entity = this.repository.create(service);
     return await this.repository.save(entity);
   }
 
-  async findOne(id: string): Promise<ProductEntity | null> {
-    const product = await this.repository.findOne({ where: { id } });
-    return product || null; 
+  async findOne(id: string): Promise<EventServiceEntity | null> {
+    return await this.repository.findOne({ where: { id } }) || null;
   }
 
-  async findAll(): Promise<ProductEntity[]> {
-    return await this.repository.find({ 
+  async findAll(): Promise<EventServiceEntity[]> {
+    return await this.repository.find({
       where: { active: true },
-      order: { createdAt: 'DESC' } 
+      order: { createdAt: 'DESC' },
     });
   }
 }
