@@ -238,6 +238,7 @@ function App() {
   const [selectedFormCategory, setSelectedFormCategory] = useState('STAFF');
   const [customFormPrice, setCustomFormPrice] = useState<number | null>(null);
   const [pendingCartItem, setPendingCartItem] = useState<CartItem | null>(null);
+  const [activeChatIndex, setActiveChatIndex] = useState(0);
 
   // Servicios iniciales del Proveedor
   const [providerServices, setProviderServices] = useState<any[]>([
@@ -374,16 +375,6 @@ function App() {
       quantity: 1,
     };
 
-    // VALIDACIÓN: Evitar mezclar proveedores distintos en el carrito
-    if (cart.length > 0) {
-      const existingProviderId = cart[0].id.split('-')[0];
-      if (customizingItem.id !== existingProviderId) {
-        setPendingCartItem(newCartItem);
-        setCustomizingItem(null);
-        return;
-      }
-    }
-
     setCart((prev) => [...prev, newCartItem]);
     setCustomizingItem(null);
   };
@@ -429,15 +420,27 @@ function App() {
         console.error("Error al crear reserva en backend real:", err);
       }
     } else {
-      // Modo Demo: Notificar al proveedor de forma simulada
+      // Modo Demo: Simular despacho concurrente de todos los proveedores en geocerca
+      // El radar simula pings a cada tipo de proveedor
       cart.forEach((item) => {
+        // Enviar alertas de depuración al bus de notificaciones
         triggerNotificationToProvider(item);
       });
 
-      // Simular un timeout de 15s si el proveedor ignora la alerta
+      // Luego de 3.5 segundos de barrido de radar, todos los proveedores aceptan sus partes de la orden
       setTimeout(() => {
-        setCheckoutStatus((current) => (current === 'searching' ? 'idle' : current));
-      }, 15000);
+        const jobs = cart.map((item, idx) => ({
+          id: `${item.id.split('-')[0]}-${idx}-${Date.now()}`,
+          title: item.title,
+          price: item.price,
+          location: eventLocation,
+          status: 'assigned'
+        }));
+        setAcceptedJobs(jobs);
+        setCurrentJobStatus('assigned');
+        setCheckoutStatus('success');
+        setActiveChatIndex(0); // Iniciar chat en el primer proveedor
+      }, 3500);
     }
   };
 
@@ -2114,46 +2117,66 @@ function App() {
 
           {/* Columna Derecha: Chatbot AI o Chat de Coordinación Pos-Pago */}
           <section className="panel panel-chat">
-            {checkoutStatus === 'success' && currentJobStatus !== 'completed' ? (
-              <>
-                <h2 className="panel-title">Canal de Coordinación Directa</h2>
-                <p className="panel-subtitle">Hablá con tu proveedor asignado para coordinar detalles logísticos.</p>
-                <CoordinationChat
-                  role="client"
-                  recipientName={acceptedJobs[0]?.title || 'Tomás Ferreyra (DJ)'}
-                  recipientAvatar="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80"
-                  isDemoMode={apiService.getMode() === 'demo'}
-                />
-              </>
-            ) : (
-              <>
-                <h2 className="panel-title">Asistente Virtual EventGo</h2>
-                <p className="panel-subtitle">Planificá tu presupuesto y agregá servicios mediante inteligencia artificial.</p>
-                <IntegratedChat onAddServiceToCart={(prod) => {
-                  // El bot añade el producto base al carrito
-                  const newCartItem: CartItem = {
-                    id: `${prod.id}-${Date.now()}`,
-                    title: prod.title,
-                    basePrice: prod.price,
-                    category: prod.category,
-                    distanceKm: prod.distanceKm,
-                    selectedExtras: [],
-                    price: prod.price,
-                    quantity: 1,
-                  };
+            {(() => {
+              const activeJob = acceptedJobs[activeChatIndex] || acceptedJobs[0];
+              const getProviderAvatar = (title?: string) => {
+                if (!title) return 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80';
+                if (title.includes('Mozo')) return 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=80&q=80';
+                if (title.includes('DJ')) return 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=80&q=80';
+                if (title.includes('Seguridad')) return 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=80&q=80';
+                if (title.includes('Catering')) return 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=80&q=80';
+                return 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80';
+              };
 
-                  if (cart.length > 0) {
-                    const existingProviderId = cart[0].id.split('-')[0];
-                    if (prod.id !== existingProviderId) {
-                      setPendingCartItem(newCartItem);
-                      return;
-                    }
-                  }
+              return checkoutStatus === 'success' && currentJobStatus !== 'completed' ? (
+                <>
+                  <h2 className="panel-title">Canal de Coordinación Directa</h2>
+                  <p className="panel-subtitle">Hablá con tus proveedores contratados para coordinar logística.</p>
+                  
+                  {/* Selector de Pestañas de Chat Multiproveedor */}
+                  {acceptedJobs.length > 1 && (
+                    <div className="chat-tabs-bar flex-items gap-xs" style={{ marginBottom: '14px', overflowX: 'auto', paddingBottom: '4px' }}>
+                      {acceptedJobs.map((job, idx) => (
+                        <button
+                          key={job.id}
+                          className={`chat-tab-select-btn ${activeChatIndex === idx ? 'active' : ''}`}
+                          onClick={() => setActiveChatIndex(idx)}
+                        >
+                          {job.title.split(' ')[0]} ({job.title.includes('DJ') ? 'DJ' : 'Staff'})
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-                  setCart((prev) => [...prev, newCartItem]);
-                }} />
-              </>
-            )}
+                  <CoordinationChat
+                    key={activeJob?.id} // Forzar re-renderizado al cambiar de canal
+                    role="client"
+                    recipientName={activeJob?.title || 'Proveedor del Evento'}
+                    recipientAvatar={getProviderAvatar(activeJob?.title)}
+                    isDemoMode={apiService.getMode() === 'demo'}
+                  />
+                </>
+              ) : (
+                <>
+                  <h2 className="panel-title">Asistente Virtual EventGo</h2>
+                  <p className="panel-subtitle">Planificá tu presupuesto y agregá servicios mediante inteligencia artificial.</p>
+                  <IntegratedChat onAddServiceToCart={(prod) => {
+                    // El bot añade el producto base al carrito
+                    const newCartItem: CartItem = {
+                      id: `${prod.id}-${Date.now()}`,
+                      title: prod.title,
+                      basePrice: prod.price,
+                      category: prod.category,
+                      distanceKm: prod.distanceKm,
+                      selectedExtras: [],
+                      price: prod.price,
+                      quantity: 1,
+                    };
+                    setCart((prev) => [...prev, newCartItem]);
+                  }} />
+                </>
+              );
+            })()}
           </section>
         </main>
       ) : (
