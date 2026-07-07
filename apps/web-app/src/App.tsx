@@ -163,10 +163,29 @@ function App() {
   // Cliente State (E-Commerce)
   const [cart, setCart] = useState<CartItem[]>([]);
   const [eventLocation, setEventLocation] = useState('Av. del Libertador 1250, Palermo');
+  const [locationInput, setLocationInput] = useState('');
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
   const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'searching' | 'success'>('idle');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [subCategoryFilter, setSubCategoryFilter] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'distance' | 'price' | 'rating'>('distance');
+
+  // Zonas predefinidas con multiplicadores de distancia (demo sin GPS real)
+  // Cada zona tiene un factor que simula la distancia relativa de los proveedores
+  const LOCATION_ZONES: Record<string, { label: string; emoji: string; distanceFactor: number; providerPool: string[] }> = {
+    'palermo':   { label: 'Palermo, CABA',         emoji: '🏙️', distanceFactor: 1.0,  providerPool: ['dj','catering','mozos','foto','seguridad'] },
+    'maipu':     { label: 'Maipú, Mendoza',         emoji: '🍇', distanceFactor: 0.7,  providerPool: ['catering','mozos','foto','musica-vivo'] },
+    'cordoba':   { label: 'Córdoba Capital',         emoji: '🏛️', distanceFactor: 0.9,  providerPool: ['dj','catering','foto','animacion'] },
+    'rosario':   { label: 'Rosario, Santa Fe',       emoji: '🌹', distanceFactor: 0.8,  providerPool: ['dj','mozos','catering','seguridad'] },
+    'belgrano':  { label: 'Belgrano, CABA',          emoji: '🏡', distanceFactor: 1.1,  providerPool: ['dj','mozos','foto','barman'] },
+    'mendoza':   { label: 'Ciudad de Mendoza',       emoji: '🏔️', distanceFactor: 0.75, providerPool: ['catering','musica-vivo','foto','barman'] },
+  };
+
+  // Detectar zona activa desde eventLocation
+  const activeZoneKey = Object.keys(LOCATION_ZONES).find(k =>
+    eventLocation.toLowerCase().includes(k)
+  ) ?? 'palermo';
+  const activeZone = LOCATION_ZONES[activeZoneKey];
 
   // Catálogo dinámico (Demo o Real API)
   const [catalog, setCatalog] = useState<any[]>([]);
@@ -1546,8 +1565,79 @@ function App() {
         <main className="app-main client-layout">
           {/* Columna Izquierda: Marketplace */}
           <section className="panel panel-catalog">
-            <h2 className="panel-title">Catálogo de Servicios</h2>
-            <p className="panel-subtitle">Explorá y personalizá los mejores servicios profesionales.</p>
+
+            {/* ── BARRA DE BÚSQUEDA DE UBICACIÓN (Hero, siempre visible) ── */}
+            <div className="location-search-hero">
+              <div className="location-search-inner">
+                <div className="location-search-icon-box">
+                  <MapPin size={18} className="location-pin-icon" />
+                </div>
+                <input
+                  type="text"
+                  className="location-search-input"
+                  placeholder="¿Dónde es tu evento? Ej: Maipú, Mendoza..."
+                  value={locationInput}
+                  onChange={(e) => {
+                    setLocationInput(e.target.value);
+                    setLocationConfirmed(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && locationInput.trim()) {
+                      setEventLocation(locationInput.trim());
+                      setLocationConfirmed(true);
+                    }
+                  }}
+                />
+                <button
+                  className="btn-location-search"
+                  onClick={() => {
+                    if (locationInput.trim()) {
+                      setEventLocation(locationInput.trim());
+                      setLocationConfirmed(true);
+                    }
+                  }}
+                >
+                  Buscar
+                </button>
+              </div>
+
+              {/* Zonas rápidas (chips) */}
+              <div className="location-zones-row flex-items gap-xs" style={{ marginTop: '10px', flexWrap: 'wrap' }}>
+                {Object.entries(LOCATION_ZONES).map(([key, zone]) => (
+                  <button
+                    key={key}
+                    className={`location-zone-chip ${activeZoneKey === key ? 'active' : ''}`}
+                    onClick={() => {
+                      setEventLocation(zone.label);
+                      setLocationInput(zone.label);
+                      setLocationConfirmed(true);
+                    }}
+                  >
+                    {zone.emoji} {zone.label.split(',')[0]}
+                  </button>
+                ))}
+              </div>
+
+              {/* Confirmación de ubicación */}
+              {locationConfirmed && (
+                <div className="location-confirmed-bar flex-items gap-sm" style={{ marginTop: '10px' }}>
+                  <span style={{ color: '#34d399', fontSize: '12px', fontWeight: 700 }}>✅ Mostrando proveedores cerca de:</span>
+                  <span style={{ color: '#fff', fontSize: '12px' }}>{eventLocation}</span>
+                  <span className="supply-demand-pill supply-high" style={{ marginLeft: 'auto', fontSize: '10px' }}>
+                    {activeZone.emoji} Zona: {activeZone.label.split(',')[0]}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Modos de uso */}
+            <div className="browse-mode-tabs flex-items gap-sm" style={{ marginTop: '14px', marginBottom: '4px' }}>
+              <span className="browse-mode-badge active">🔍 Explorar sin evento</span>
+              <span className="browse-mode-badge">🎉 Organizar evento</span>
+              <span className="text-muted" style={{ fontSize: '10px', marginLeft: 'auto' }}>
+                {catalog.length} servicios disponibles
+              </span>
+            </div>
 
             {/* PedidosYa UX - Categorías Principales */}
             <div className="pedidosya-verticals-selector-container">
