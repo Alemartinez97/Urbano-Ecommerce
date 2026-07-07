@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Star, MapPin, Grid, MessageSquare, Image, ShieldCheck } from 'lucide-react';
+import { X, Star, MapPin, Grid, MessageSquare, Image, ShieldCheck, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 interface ProviderPublicProfileModalProps {
   provider: any;
@@ -17,9 +17,46 @@ export const ProviderPublicProfileModal: React.FC<ProviderPublicProfileModalProp
   onAddToCart
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'info' | 'gallery' | 'reviews'>('info');
+  const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1.0);
 
   const ratingAvg = provider.rating || 4.8;
   const isCompany = provider.providerConfig?.entityType === 'company' || provider.id.startsWith('company');
+
+  // Determinar si la URL es un video
+  const isVideoFile = (url: string) => {
+    return url.toLowerCase().endsWith('.mp4') || url.toLowerCase().endsWith('.mov') || url.includes('video') || url.startsWith('blob:') && url.includes('video');
+  };
+
+  // Controles de navegación de la pasarela
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (activeLightboxIndex === null || gallery.length === 0) return;
+    setActiveLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : gallery.length - 1));
+    setZoomLevel(1.0); // Reset zoom al cambiar de imagen
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (activeLightboxIndex === null || gallery.length === 0) return;
+    setActiveLightboxIndex((prev) => (prev !== null && prev < gallery.length - 1 ? prev + 1 : 0));
+    setZoomLevel(1.0); // Reset zoom al cambiar de imagen
+  };
+
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setZoomLevel((prev) => Math.min(prev + 0.25, 3.0));
+  };
+
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setZoomLevel((prev) => Math.max(prev - 0.25, 1.0));
+  };
+
+  const handleResetZoom = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setZoomLevel(1.0);
+  };
 
   return (
     <div className="modal-backdrop">
@@ -82,7 +119,7 @@ export const ProviderPublicProfileModal: React.FC<ProviderPublicProfileModalProp
             onClick={() => setActiveSubTab('gallery')}
           >
             <Image size={14} />
-            <span>Galería</span>
+            <span>Galería ({gallery.length})</span>
           </button>
           <button 
             className={`profile-sub-tab ${activeSubTab === 'reviews' ? 'active' : ''}`}
@@ -138,11 +175,27 @@ export const ProviderPublicProfileModal: React.FC<ProviderPublicProfileModalProp
                   <span>No hay archivos multimedia cargados aún.</span>
                 </div>
               ) : (
-                gallery.map((media) => (
-                  <div key={media.id} className="gallery-media-item">
-                    <img src={media.url} alt={media.title} className="gallery-media-img" />
+                gallery.map((media, index) => (
+                  <div 
+                    key={media.id} 
+                    className="gallery-media-item"
+                    onClick={() => {
+                      setActiveLightboxIndex(index);
+                      setZoomLevel(1.0);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {isVideoFile(media.url) ? (
+                      <div className="gallery-video-preview-wrapper" style={{ width: '100%', height: '100%', position: 'relative' }}>
+                        <video src={media.url} className="gallery-media-img" muted playsInline />
+                        <div className="video-play-badge">▶ Video</div>
+                      </div>
+                    ) : (
+                      <img src={media.url} alt={media.title} className="gallery-media-img" />
+                    )}
                     <div className="gallery-media-hover-overlay">
                       <span>{media.title}</span>
+                      <span className="gallery-zoom-prompt" style={{ fontSize: '10px', marginTop: '6px', color: '#c084fc' }}>🔎 Ver en Pantalla Completa</span>
                     </div>
                   </div>
                 ))
@@ -182,6 +235,80 @@ export const ProviderPublicProfileModal: React.FC<ProviderPublicProfileModalProp
           )}
         </div>
       </div>
+
+      {/* PASARELA DE FOTOS Y VIDEOS CON CONTROLES DE ZOOM (LIGHTBOX DIALOG) */}
+      {activeLightboxIndex !== null && gallery[activeLightboxIndex] && (
+        <div 
+          className="lightbox-overlay"
+          onClick={() => setActiveLightboxIndex(null)}
+        >
+          {/* Contenedor central */}
+          <div className="lightbox-content-card" onClick={(e) => e.stopPropagation()}>
+            
+            {/* Cabecera del Lightbox */}
+            <div className="lightbox-header flex-items justify-between">
+              <span className="lightbox-title-text">
+                {gallery[activeLightboxIndex].title} ({activeLightboxIndex + 1} de {gallery.length})
+              </span>
+              
+              {/* Controles de Zoom */}
+              {!isVideoFile(gallery[activeLightboxIndex].url) && (
+                <div className="lightbox-zoom-controls flex-items gap-sm">
+                  <button className="btn-lightbox-action" onClick={handleZoomOut} title="Zoom Out">
+                    <ZoomOut size={16} />
+                  </button>
+                  <span className="zoom-value-label">{Math.round(zoomLevel * 100)}%</span>
+                  <button className="btn-lightbox-action" onClick={handleZoomIn} title="Zoom In">
+                    <ZoomIn size={16} />
+                  </button>
+                  {zoomLevel > 1.0 && (
+                    <button className="btn-lightbox-action" onClick={handleResetZoom} title="Restablecer">
+                      <RotateCcw size={14} />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <button className="btn-close-lightbox" onClick={() => setActiveLightboxIndex(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Cuerpo del Visualizador */}
+            <div className="lightbox-body">
+              {/* Botón Navegación Izquierda */}
+              <button className="btn-lightbox-nav prev" onClick={handlePrev}>
+                <ChevronLeft size={24} />
+              </button>
+
+              {/* Contenedor del archivo */}
+              <div className="lightbox-viewport">
+                {isVideoFile(gallery[activeLightboxIndex].url) ? (
+                  <video 
+                    src={gallery[activeLightboxIndex].url} 
+                    className="lightbox-video-element" 
+                    controls 
+                    autoPlay 
+                    style={{ transform: `scale(${zoomLevel})` }}
+                  />
+                ) : (
+                  <img 
+                    src={gallery[activeLightboxIndex].url} 
+                    alt={gallery[activeLightboxIndex].title} 
+                    className="lightbox-image-element"
+                    style={{ transform: `scale(${zoomLevel})` }}
+                  />
+                )}
+              </div>
+
+              {/* Botón Navegación Derecha */}
+              <button className="btn-lightbox-nav next" onClick={handleNext}>
+                <ChevronRight size={24} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
