@@ -237,6 +237,7 @@ function App() {
   const [seniorityMonths, setSeniorityMonths] = useState(14);
   const [selectedFormCategory, setSelectedFormCategory] = useState('STAFF');
   const [customFormPrice, setCustomFormPrice] = useState<number | null>(null);
+  const [pendingCartItem, setPendingCartItem] = useState<CartItem | null>(null);
 
   // Servicios iniciales del Proveedor
   const [providerServices, setProviderServices] = useState<any[]>([
@@ -372,6 +373,16 @@ function App() {
       price: finalItemPrice,
       quantity: 1,
     };
+
+    // VALIDACIÓN: Evitar mezclar proveedores distintos en el carrito
+    if (cart.length > 0) {
+      const existingProviderId = cart[0].id.split('-')[0];
+      if (customizingItem.id !== existingProviderId) {
+        setPendingCartItem(newCartItem);
+        setCustomizingItem(null);
+        return;
+      }
+    }
 
     setCart((prev) => [...prev, newCartItem]);
     setCustomizingItem(null);
@@ -1169,6 +1180,41 @@ function App() {
             handleUploadMedia(url, title);
           }}
         />
+      )}
+
+      {/* Modal de Advertencia de Reemplazar Carrito (PedidosYa Style) */}
+      {pendingCartItem && (
+        <div className="modal-backdrop" style={{ zIndex: 1200 }}>
+          <div className="modal-card review-modal-card replacement-cart-modal">
+            <div className="modal-glow" />
+            <h2 className="modal-title flex-items">
+              ⚠️ ¿Querés cambiar de proveedor?
+            </h2>
+            <p className="modal-subtitle" style={{ marginTop: '8px', lineHeight: '1.4' }}>
+              Tu carrito ya contiene servicios de otro proveedor. Para asegurar la correcta coordinación y facturación pos-pago, solo podés contratar servicios de un único proveedor por pedido.
+              <br /><br />
+              Si continuás, <strong>se vaciará tu carrito actual</strong> para agregar <strong>{pendingCartItem.title}</strong>.
+            </p>
+            <div className="customizer-footer" style={{ marginTop: '20px' }}>
+              <button 
+                className="btn-cancel" 
+                onClick={() => setPendingCartItem(null)}
+              >
+                Volver
+              </button>
+              <button 
+                className="btn-confirm" 
+                style={{ background: 'var(--color-neon-purple)' }}
+                onClick={() => {
+                  setCart([pendingCartItem]);
+                  setPendingCartItem(null);
+                }}
+              >
+                Vaciar y Agregar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Header */}
@@ -2095,6 +2141,15 @@ function App() {
                     price: prod.price,
                     quantity: 1,
                   };
+
+                  if (cart.length > 0) {
+                    const existingProviderId = cart[0].id.split('-')[0];
+                    if (prod.id !== existingProviderId) {
+                      setPendingCartItem(newCartItem);
+                      return;
+                    }
+                  }
+
                   setCart((prev) => [...prev, newCartItem]);
                 }} />
               </>

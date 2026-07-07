@@ -4991,6 +4991,20 @@ body {
   transform: translateY(0);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   MODAL DE ADVERTENCIA DE REEMPLAZAR CARRITO (ONE PROVIDER RULE)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.replacement-cart-modal {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.15), 0 25px 60px rgba(0, 0, 0, 0.8) !important;
+}
+
+.replacement-cart-modal .modal-glow {
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, rgba(0, 0, 0, 0) 70%) !important;
+}
+
+
 
 
 
