@@ -8,6 +8,9 @@ import { calculateCartTotal } from './utils/pricing';
 import { LoginScreen } from './components/LoginScreen';
 import type { SessionUser } from './components/LoginScreen';
 import { apiService, EVENT_CATEGORIES } from './services/apiService';
+import { CoordinationChat } from './components/CoordinationChat';
+import { ProviderPublicProfileModal } from './components/ProviderPublicProfileModal';
+import { GoogleDrivePickerModal } from './components/GoogleDrivePickerModal';
 import './App.css';
 import './components/IntegratedChat.css';
 
@@ -52,9 +55,27 @@ const TRACKING_STEPS = [
 ];
 
 function App() {
-  // ── Sesión de usuario ──────────────────────────────────────────────────────
   // null = no logueado → muestra LoginScreen
-  const [session, setSession] = useState<SessionUser | null>(null);
+  const [session, setSession] = useState<SessionUser | null>(() => {
+    const stored = localStorage.getItem('eventgo_session');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  // Sincronizar sesión con localStorage
+  useEffect(() => {
+    if (session) {
+      localStorage.setItem('eventgo_session', JSON.stringify(session));
+    } else {
+      localStorage.removeItem('eventgo_session');
+    }
+  }, [session]);
 
   // El rol lo determina la sesión: 'client' o 'provider'
   const role = session?.role ?? 'client';
@@ -135,7 +156,6 @@ function App() {
   // Proveedor State
   const [isOnline, setIsOnline] = useState(false);
   const [acceptedJobs, setAcceptedJobs] = useState<any[]>([]);
-  const [declinedJobs, setDeclinedJobs] = useState<string[]>([]);
   
   // Sincronización del estado del evento para el cliente
   const [currentJobStatus, setCurrentJobStatus] = useState<string>('assigned');
@@ -208,6 +228,67 @@ function App() {
   const [customizingItem, setCustomizingItem] = useState<any | null>(null);
   const [selectedExtras, setSelectedExtras] = useState<ExtraItem[]>([]);
 
+  // Gestión de Proveedor (CRUD y Multimedia)
+  const [providerTab, setProviderTab] = useState<'jobs' | 'services' | 'gallery' | 'reviews'>('jobs');
+  const [selectedPublicProvider, setSelectedPublicProvider] = useState<any | null>(null);
+  const [editingService, setEditingService] = useState<any | null>(null);
+  const [showAddServiceModal, setShowAddServiceModal] = useState(false);
+  const [showDrivePicker, setShowDrivePicker] = useState(false);
+  const [seniorityMonths, setSeniorityMonths] = useState(14);
+  const [selectedFormCategory, setSelectedFormCategory] = useState('STAFF');
+  const [customFormPrice, setCustomFormPrice] = useState<number | null>(null);
+
+  // Servicios iniciales del Proveedor
+  const [providerServices, setProviderServices] = useState<any[]>([
+    {
+      id: 'ps-1',
+      title: 'Servicio de Mozo Premium',
+      category: 'STAFF',
+      subCategory: 'waiter',
+      price: 5500,
+      description: 'Atención personalizada para mesas principales, protocolo formal.',
+      availableExtras: [
+        { name: 'Vajilla fina incluida', price: 2000 }
+      ]
+    },
+    {
+      id: 'ps-2',
+      title: 'Sommelier para Recepción',
+      category: 'STAFF',
+      subCategory: 'barman',
+      price: 7000,
+      description: 'Asesoramiento y servicio de cata de vinos de alta gama para invitados.',
+      availableExtras: [
+        { name: 'Copas de cristal importadas', price: 3000 }
+      ]
+    }
+  ]);
+
+  // Galería de fotos/videos inicial del Proveedor (URLs reales atractivas de Unsplash)
+  const [providerGallery, setProviderGallery] = useState<any[]>([
+    { id: 'g-1', type: 'image', url: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=400&q=80', title: 'Decoración del Salón' },
+    { id: 'g-2', type: 'image', url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80', title: 'Set de luces DJ' },
+    { id: 'g-3', type: 'image', url: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&w=400&q=80', title: 'Servicio de mesa formal' }
+  ]);
+
+  // Reseñas y comentarios mock sobre los proveedores (para visualización del cliente)
+  const [mockReviews] = useState<Record<string, any[]>>({
+    'p1': [
+      { name: 'Carlos G.', rating: 5, comment: 'Excelente servicio. Muy puntuales y formales en todo momento.', date: 'Ayer' },
+      { name: 'Mariana F.', rating: 4, comment: 'Muy buena atención, se adaptaron rápido a los cambios de horario.', date: 'Hace 3 días' }
+    ],
+    'p2': [
+      { name: 'Esteban L.', rating: 5, comment: '¡La música estuvo increíble! Todos bailaron hasta el final del evento.', date: 'Hace 1 semana' },
+      { name: 'Sofía M.', rating: 5, comment: 'El juego de luces robóticas y el sonido fueron de primer nivel. Recomiendo.', date: 'Hace 2 semanas' }
+    ],
+    'p3': [
+      { name: 'Ramiro J.', rating: 5, comment: 'El mejor asado que probamos. La carne estaba a punto y las achuras riquísimas.', date: 'Hace 4 días' }
+    ],
+    'p4': [
+      { name: 'Florencia T.', rating: 4, comment: 'Fotos hermosas y el video resumen capturó los mejores momentos.', date: 'Hace 1 semana' }
+    ]
+  });
+
   // Callback para recibir notificaciones en pantalla tipo Uber
   const handleInAppNotification = useCallback((payload: EventNotificationPayload) => {
     setActivePayload(payload);
@@ -256,8 +337,7 @@ function App() {
     setCheckoutStatus('success');
   };
 
-  const handleDecline = (bookingId: string) => {
-    setDeclinedJobs((prev) => [...prev, bookingId]);
+  const handleDecline = () => {
     setActivePayload(null);
     setCheckoutStatus('idle');
   };
@@ -384,6 +464,44 @@ function App() {
     setReviewingOrder(null);
     setReviewComment('');
     setRating(5);
+  };
+
+  // CRUD de servicios del Proveedor
+  const handleSaveService = (serviceData: any) => {
+    if (editingService) {
+      // Edición
+      setProviderServices(prev => prev.map(s => s.id === editingService.id ? { ...s, ...serviceData } : s));
+    } else {
+      // Creación
+      const newService = {
+        id: `ps-${Date.now()}`,
+        ...serviceData,
+        availableExtras: [{ name: 'Soporte adicional extendido', price: 1500 }]
+      };
+      setProviderServices(prev => [...prev, newService]);
+    }
+    setEditingService(null);
+    setShowAddServiceModal(false);
+  };
+
+  const handleDeleteService = (serviceId: string) => {
+    setProviderServices(prev => prev.filter(s => s.id !== serviceId));
+  };
+
+  // Simulación de carga multimedia
+  const handleUploadMedia = (url: string, title: string) => {
+    if (!url) return;
+    const newMedia = {
+      id: `g-${Date.now()}`,
+      type: 'image',
+      url,
+      title: title || 'Trabajo del evento'
+    };
+    setProviderGallery(prev => [...prev, newMedia]);
+  };
+
+  const handleDeleteMedia = (mediaId: string) => {
+    setProviderGallery(prev => prev.filter(g => g.id !== mediaId));
   };
 
   const applyCoupon = () => {
@@ -791,6 +909,251 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Perfil Público de Proveedor (Vista del Cliente) */}
+      {selectedPublicProvider && (
+        <ProviderPublicProfileModal
+          provider={selectedPublicProvider}
+          reviews={mockReviews[selectedPublicProvider.id] || [
+            { name: 'Deyvid O.', rating: 5, comment: 'Excelente profesional, sumamente recomendable.', date: 'Ayer' },
+            { name: 'Ana B.', rating: 4, comment: 'Puntual y muy buena disposición para el evento.', date: 'Hace 4 días' }
+          ]}
+          gallery={providerGallery}
+          onClose={() => setSelectedPublicProvider(null)}
+          onAddToCart={(prod) => openCustomizer(prod)}
+        />
+      )}
+
+      {/* Modal de Agregar / Editar Servicio (CRUD del Proveedor) */}
+      {showAddServiceModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card provider-service-crud-modal">
+            <div className="modal-glow" />
+            <div className="modal-header-row">
+              <h2 className="modal-title">
+                {editingService ? 'Editar Servicio' : 'Agregar Nuevo Servicio'}
+              </h2>
+              <button 
+                className="btn-close-modal" 
+                onClick={() => {
+                  setEditingService(null);
+                  setShowAddServiceModal(false);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <p className="modal-subtitle">
+              Configurá los detalles del servicio que vas a ofrecer a los clientes.
+            </p>
+
+            {(() => {
+              // Algoritmo de cálculo dinámico para el modal
+              const getBasePrice = (cat: string) => {
+                switch (cat) {
+                  case 'STAFF': return 4000;
+                  case 'MUSIC': return 7500;
+                  case 'CATERING': return 11000;
+                  case 'MEDIA': return 6500;
+                  default: return 5000;
+                }
+              };
+              
+              const basePriceVal = getBasePrice(selectedFormCategory);
+              const seniorityMultiplier = seniorityMonths < 6 ? 1.0 : seniorityMonths <= 18 ? 1.15 : 1.35;
+              const seniorityLevelName = seniorityMonths < 6 ? 'Plata (1.0x)' : seniorityMonths <= 18 ? 'Platino (1.15x)' : 'Diamante (1.35x)';
+              const demandMultiplier = multiplier; // tarifa dinámica de geocerca actual
+              const recommendedPrice = Math.round(basePriceVal * demandMultiplier * seniorityMultiplier);
+              const activePrice = customFormPrice ?? recommendedPrice;
+
+              return (
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    handleSaveService({
+                      title: fd.get('title') as string,
+                      category: fd.get('category') as string,
+                      subCategory: fd.get('subCategory') as string,
+                      price: activePrice,
+                      description: fd.get('description') as string
+                    });
+                  }}
+                  className="modal-setup-body"
+                  style={{ marginTop: '12px', gap: '14px', display: 'flex', flexDirection: 'column' }}
+                >
+                  <div className="setup-field-group">
+                    <label className="field-label">Nombre del Servicio</label>
+                    <input 
+                      type="text" 
+                      name="title" 
+                      defaultValue={editingService?.title || ''} 
+                      placeholder="Ej: DJ Setup con Iluminación Led"
+                      className="login-api-url-input"
+                      style={{ width: '100%' }}
+                      required
+                    />
+                  </div>
+
+                  <div className="flex-items gap-sm">
+                    <div className="setup-field-group" style={{ flex: 1 }}>
+                      <label className="field-label">Categoría</label>
+                      <select 
+                        name="category" 
+                        value={selectedFormCategory}
+                        onChange={(e) => {
+                          setSelectedFormCategory(e.target.value);
+                          setCustomFormPrice(null); // Reset para recalcular sugerido
+                        }}
+                        className="login-api-url-input"
+                        style={{ width: '100%', padding: '12px 14px' }}
+                        required
+                      >
+                        {EVENT_CATEGORIES.map(c => (
+                          <option key={c.id} value={c.id} style={{ background: '#121218', color: '#fff' }}>{c.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="setup-field-group" style={{ flex: 1 }}>
+                      <label className="field-label">Subcategoría (Especialidad)</label>
+                      <select 
+                        name="subCategory" 
+                        defaultValue={editingService?.subCategory || 'waiter'}
+                        className="login-api-url-input"
+                        style={{ width: '100%', padding: '12px 14px' }}
+                        required
+                      >
+                        {EVENT_CATEGORIES.flatMap(c => c.subcategories).map(s => (
+                          <option key={s.id} value={s.id} style={{ background: '#121218', color: '#fff' }}>{s.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* ALGORITMO: Estimador Dinámico de Precios (Oferta, Demanda, Antigüedad) */}
+                  <div className="setup-field-group smart-pricing-card">
+                    <span className="section-mini-label" style={{ color: '#60a5fa' }}>💡 TARIFADOR DE PRECIO RECOMENDADO</span>
+                    
+                    {/* Control de Antigüedad */}
+                    <div className="seniority-slider-row" style={{ marginTop: '8px' }}>
+                      <div className="flex-items justify-between">
+                        <span className="slider-label">Antigüedad en EventGo:</span>
+                        <span className="slider-value-badge">{seniorityMonths} meses ({seniorityLevelName})</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="1" 
+                        max="36" 
+                        value={seniorityMonths}
+                        onChange={(e) => {
+                          setSeniorityMonths(Number(e.target.value));
+                          setCustomFormPrice(null); // Recalcular automáticamente
+                        }}
+                        className="surge-multiplier-slider"
+                        style={{ width: '100%', marginTop: '6px' }}
+                      />
+                    </div>
+
+                    {/* Desglose Matemático */}
+                    <div className="pricing-formula-breakdown flex-items justify-between" style={{ marginTop: '12px', padding: '10px', background: 'rgba(0,0,0,0.25)', borderRadius: '6px' }}>
+                      <div className="formula-item">
+                        <span className="formula-title">Base</span>
+                        <span className="formula-num">${basePriceVal.toLocaleString()}</span>
+                      </div>
+                      <span className="formula-op">×</span>
+                      <div className="formula-item">
+                        <span className="formula-title">Demanda (Surge)</span>
+                        <span className="formula-num" style={{ color: demandMultiplier > 1 ? '#fbbf24' : '#fff' }}>
+                          {demandMultiplier}x
+                        </span>
+                      </div>
+                      <span className="formula-op">×</span>
+                      <div className="formula-item">
+                        <span className="formula-title">Antigüedad</span>
+                        <span className="formula-num">{seniorityMultiplier}x</span>
+                      </div>
+                      <span className="formula-op">=</span>
+                      <div className="formula-item recommended-result">
+                        <span className="formula-title" style={{ color: 'var(--color-neon-purple)' }}>Sugerido</span>
+                        <span className="formula-num" style={{ color: 'var(--color-neon-purple)', fontWeight: 800 }}>
+                          ${recommendedPrice.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Input de Precio Activo */}
+                    <div className="pricing-input-adjustment flex-items justify-between gap-sm" style={{ marginTop: '12px' }}>
+                      <div className="flex-column" style={{ flexGrow: 1 }}>
+                        <span className="slider-label">Tarifa Final por Hora ($)</span>
+                        <input 
+                          type="number"
+                          name="price"
+                          value={activePrice}
+                          min="1000"
+                          max="90000"
+                          onChange={(e) => setCustomFormPrice(Number(e.target.value))}
+                          className="login-api-url-input"
+                          style={{ width: '100%', marginTop: '4px' }}
+                          required
+                        />
+                      </div>
+                      {customFormPrice !== null && (
+                        <button 
+                          type="button" 
+                          className="btn-edit-svc"
+                          onClick={() => setCustomFormPrice(null)}
+                          style={{ alignSelf: 'flex-end', height: '42px', display: 'flex', alignItems: 'center' }}
+                        >
+                          Usar Sugerido
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="setup-field-group">
+                    <label className="field-label">Descripción del Servicio</label>
+                    <textarea 
+                      name="description" 
+                      defaultValue={editingService?.description || ''} 
+                      placeholder="Detallá los equipamientos o servicios incluidos..."
+                      className="setup-textarea"
+                      maxLength={180}
+                      required
+                    />
+                  </div>
+
+                  <div className="customizer-footer" style={{ marginTop: '8px' }}>
+                    <button 
+                      type="button" 
+                      className="btn-cancel" 
+                      onClick={() => {
+                        setEditingService(null);
+                        setShowAddServiceModal(false);
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                    <button type="submit" className="btn-confirm">
+                      Guardar Servicio
+                    </button>
+                  </div>
+                </form>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Selector de Google Drive */}
+      {showDrivePicker && (
+        <GoogleDrivePickerModal
+          onClose={() => setShowDrivePicker(false)}
+          onSelectFile={(url, title) => {
+            handleUploadMedia(url, title);
+          }}
+        />
       )}
 
       {/* Header */}
@@ -1220,7 +1583,14 @@ function App() {
             {/* Catalog List PedidosYa Store Cards */}
             <div className="catalog-list">
               {filteredCatalog.map((prod) => (
-                <div key={prod.id} className="catalog-item-card store-card-pedidosya">
+                <div 
+                  key={prod.id} 
+                  className="catalog-item-card store-card-pedidosya clickable-store-card"
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('.btn-add-cart')) return;
+                    setSelectedPublicProvider(prod);
+                  }}
+                >
                   <div className="catalog-item-header">
                     <span className="catalog-item-emoji">{getCategoryEmoji(prod.category)}</span>
                     <span className="catalog-item-category">{prod.category}</span>
@@ -1240,21 +1610,24 @@ function App() {
                     <div className="store-rating-box">
                       <Star size={12} className="star-filled-icon" />
                       <span className="rating-value">{prod.rating}</span>
-                      <span className="reviews-count">({prod.reviewsCount}+)</span>
+                      <span className="reviews-count">({prod.reviewsCount || 10}+)</span>
                     </div>
                     <span className="bullet-divider">•</span>
-                    <span className="eta-badge">{prod.etaMin}</span>
+                    <span className="eta-badge">{prod.etaMin || '15-25 min'}</span>
                     <span className="bullet-divider">•</span>
-                    <span className="shipping-badge">Envío ${prod.shippingPrice}</span>
+                    <span className="shipping-badge">Envío ${prod.shippingPrice || 250}</span>
                   </div>
 
                   <div className="catalog-item-meta" style={{ marginTop: '14px' }}>
                     <span className="price-tag">Mínimo: ${prod.price.toLocaleString()}</span>
                     <span>📍 {prod.distanceKm} km</span>
                   </div>
-                  <button className="btn-add-cart" onClick={() => openCustomizer(prod)}>
-                    Personalizar y Agregar
-                  </button>
+                  <div className="card-actions-row">
+                    <span className="btn-view-profile-link">Ver Perfil Público</span>
+                    <button className="btn-add-cart" onClick={() => openCustomizer(prod)}>
+                      Personalizar y Agregar
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1678,121 +2051,365 @@ function App() {
             </div>
           </section>
 
-          {/* Columna Derecha: Chatbot AI */}
+          {/* Columna Derecha: Chatbot AI o Chat de Coordinación Pos-Pago */}
           <section className="panel panel-chat">
-            <h2 className="panel-title">Asistente Virtual EventGo</h2>
-            <p className="panel-subtitle">Planificá tu presupuesto y agregá servicios mediante inteligencia artificial.</p>
-            <IntegratedChat onAddServiceToCart={(prod) => {
-              // El bot añade el producto base al carrito
-              const newCartItem: CartItem = {
-                id: `${prod.id}-${Date.now()}`,
-                title: prod.title,
-                basePrice: prod.price,
-                category: prod.category,
-                distanceKm: prod.distanceKm,
-                selectedExtras: [],
-                price: prod.price,
-                quantity: 1,
-              };
-              setCart((prev) => [...prev, newCartItem]);
-            }} />
+            {checkoutStatus === 'success' && currentJobStatus !== 'completed' ? (
+              <>
+                <h2 className="panel-title">Canal de Coordinación Directa</h2>
+                <p className="panel-subtitle">Hablá con tu proveedor asignado para coordinar detalles logísticos.</p>
+                <CoordinationChat
+                  role="client"
+                  recipientName={acceptedJobs[0]?.title || 'Tomás Ferreyra (DJ)'}
+                  recipientAvatar="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80"
+                  isDemoMode={apiService.getMode() === 'demo'}
+                />
+              </>
+            ) : (
+              <>
+                <h2 className="panel-title">Asistente Virtual EventGo</h2>
+                <p className="panel-subtitle">Planificá tu presupuesto y agregá servicios mediante inteligencia artificial.</p>
+                <IntegratedChat onAddServiceToCart={(prod) => {
+                  // El bot añade el producto base al carrito
+                  const newCartItem: CartItem = {
+                    id: `${prod.id}-${Date.now()}`,
+                    title: prod.title,
+                    basePrice: prod.price,
+                    category: prod.category,
+                    distanceKm: prod.distanceKm,
+                    selectedExtras: [],
+                    price: prod.price,
+                    quantity: 1,
+                  };
+                  setCart((prev) => [...prev, newCartItem]);
+                }} />
+              </>
+            )}
           </section>
         </main>
       ) : (
-        /* ==================== PANEL DEL PROVEEDOR ==================== */
+        /* ==================== PANEL DEL PROVEEDOR (DASHBOARD) ==================== */
         <main className="app-main provider-layout">
-          <section className="panel panel-status">
-            <h2 className="panel-title">Tu Panel de Proveedor</h2>
-            <p className="panel-subtitle">Gestioná tu estado de conexión e historial de alertas.</p>
+          {/* Menú Lateral Sólido y Bien Distribuido (Dashboard Navigation) */}
+          <aside className="provider-sidebar-panel">
+            <div className="provider-sidebar-header">
+              <span className="sidebar-subtitle">Consola de Negocio</span>
+              <h3 className="sidebar-title">{session?.name}</h3>
+              <span className="sidebar-role-badge">
+                {session?.providerConfig?.entityType === 'company' ? '🏢 Empresa Registrada' : '👤 Profesional Independiente'}
+              </span>
+            </div>
 
-            {/* Estado de Conectividad */}
-            <div className="status-card-3d">
-              <span className="status-label-3d">CONECTIVIDAD EN TIEMPO REAL</span>
-              <div className="status-toggle-row">
-                <span className={`status-status-text ${isOnline ? 'online' : 'offline'}`}>
-                  {isOnline ? 'CONECTADO & LOCALIZADO' : 'DESCONECTADO'}
+            <nav className="provider-sidebar-nav">
+              <button 
+                className={`sidebar-nav-item ${providerTab === 'jobs' ? 'active' : ''}`}
+                onClick={() => setProviderTab('jobs')}
+              >
+                📋 Trabajos & Conexión
+              </button>
+              <button 
+                className={`sidebar-nav-item ${providerTab === 'services' ? 'active' : ''}`}
+                onClick={() => setProviderTab('services')}
+              >
+                🛍️ Mis Servicios ({providerServices.length})
+              </button>
+              <button 
+                className={`sidebar-nav-item ${providerTab === 'gallery' ? 'active' : ''}`}
+                onClick={() => setProviderTab('gallery')}
+              >
+                📸 Galería & Multimedia
+              </button>
+              <button 
+                className={`sidebar-nav-item ${providerTab === 'reviews' ? 'active' : ''}`}
+                onClick={() => setProviderTab('reviews')}
+              >
+                📈 Mis Reseñas (4.8 ★)
+              </button>
+            </nav>
+
+            {/* Estado Rápido Online/Offline */}
+            <div className="sidebar-footer-status">
+              <div className="flex-items justify-between">
+                <span className="status-label-text">Estado de Ventas:</span>
+                <span className={`status-pill-badge ${isOnline ? 'online' : 'offline'}`}>
+                  {isOnline ? 'ONLINE' : 'OFFLINE'}
                 </span>
-                <button
-                  className={`btn-toggle-3d ${isOnline ? 'active' : ''}`}
-                  onClick={() => setIsOnline(!isOnline)}
-                >
-                  {isOnline ? 'Desconectar' : 'Conectarse'}
-                </button>
               </div>
+              <button 
+                className={`btn-toggle-status-sidebar ${isOnline ? 'active' : ''}`}
+                onClick={() => setIsOnline(!isOnline)}
+              >
+                {isOnline ? 'Pausar Ventas' : 'Activar Ventas'}
+              </button>
             </div>
+          </aside>
 
-            {/* Historial de Pings */}
-            <div className="activity-summary">
-              <div className="activity-item accepted">
-                <span className="activity-count">{acceptedJobs.length}</span>
-                <span className="activity-label">Aceptados</span>
-              </div>
-              <div className="activity-divider" />
-              <div className="activity-item declined">
-                <span className="activity-count">{declinedJobs.length}</span>
-                <span className="activity-label">Rechazados</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Eventos Activos / Agenda */}
-          <section className="panel panel-simulator">
-            <h2 className="panel-title">Agenda y Ofertas Aceptadas</h2>
-            <p className="panel-subtitle">Gestioná el avance del servicio en tiempo real para el cliente.</p>
-
-            {acceptedJobs.length === 0 ? (
-              <div className="no-events-placeholder">
-                <Award size={36} />
-                <p>No tenés eventos activos actualmente. Conectate y esperá las ofertas del Organizador.</p>
-              </div>
-            ) : (
-              <div className="event-cards-grid">
-                {acceptedJobs.map((job) => (
-                  <div key={job.id} className="event-card accepted-job-card-3d">
-                    <div className="event-card-top">
-                      <span className="event-card-category-active">EVENTO CONFIRMADO</span>
-                      <span className="event-card-status-badge">{currentJobStatus.toUpperCase()}</span>
+          {/* Cuerpo Central del Panel del Proveedor */}
+          <div className="provider-body-content flex-grow">
+            
+            {/* PESTAÑA A: Trabajos & Tracking */}
+            {providerTab === 'jobs' && (
+              <div className="flex-column gap-lg" style={{ height: '100%' }}>
+                <section className="panel" style={{ flexGrow: 1 }}>
+                  <h2 className="panel-title">Monitoreo de Servicios & Geocercas</h2>
+                  <p className="panel-subtitle">Administrá el avance de tus trabajos activos y visualizá solicitudes.</p>
+                  
+                  {acceptedJobs.length === 0 ? (
+                    <div className="no-events-placeholder">
+                      <Award size={36} className="placeholder-icon" />
+                      <p>No tenés eventos activos en este momento. Mantenete Online para recibir alertas geocercanas.</p>
                     </div>
-                    <h3 className="event-card-title">{job.title}</h3>
-                    <p className="event-card-description">Ubicación: {job.location}</p>
-                    <div className="event-card-meta">
-                      <span className="meta-item price">${job.price.toLocaleString()}</span>
-                      <span className="meta-item duration">10 km Geocerca</span>
-                    </div>
+                  ) : (
+                    <div className="event-cards-grid">
+                      {acceptedJobs.map((job) => (
+                        <div key={job.id} className="event-card accepted-job-card-3d">
+                          <div className="event-card-top">
+                            <span className="event-card-category-active">CONTRATACIÓN ACTIVA</span>
+                            <span className="event-card-status-badge">{currentJobStatus.toUpperCase()}</span>
+                          </div>
+                          <h3 className="event-card-title">{job.title}</h3>
+                          <p className="event-card-description">📍 Destino del evento: {job.location}</p>
+                          <div className="event-card-meta">
+                            <span className="meta-item price">${job.price.toLocaleString()}</span>
+                            <span className="meta-item duration">10 km Cobertura</span>
+                          </div>
 
-                    {/* Botón para actualizar el estado del servicio */}
-                    {currentJobStatus !== 'completed' ? (
-                      <button
-                        onClick={() => advanceJobStatus(job.id)}
-                        className="btn-advance-status"
-                      >
-                        <Play size={12} />
-                        <span>
-                          AVANZAR A:{' '}
-                          {currentJobStatus === 'assigned'
-                            ? 'PREPARANDO'
-                            : currentJobStatus === 'preparing'
-                            ? 'EN CAMINO'
-                            : currentJobStatus === 'on_the_way'
-                            ? 'LLEGADO AL EVENTO'
-                            : 'FINALIZAR'}
-                        </span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => advanceJobStatus(job.id)}
-                        className="btn-advance-status"
-                        style={{ background: 'linear-gradient(135deg, var(--color-neon-emerald) 0%, #059669 100%)' }}
-                      >
-                        <CheckCircle2 size={12} />
-                        <span>ARCHIVAR TRABAJO COMPLETADO</span>
-                      </button>
-                    )}
-                  </div>
-                ))}
+                          {/* Botón para actualizar el estado del servicio */}
+                          {currentJobStatus !== 'completed' ? (
+                            <button
+                              onClick={() => advanceJobStatus(job.id)}
+                              className="btn-advance-status"
+                            >
+                              <Play size={12} />
+                              <span>
+                                AVANZAR A:{' '}
+                                {currentJobStatus === 'assigned'
+                                  ? 'PREPARANDO EQUIPAMIENTO'
+                                  : currentJobStatus === 'preparing'
+                                  ? 'EN CAMINO'
+                                  : currentJobStatus === 'on_the_way'
+                                  ? 'LLEGADO AL EVENTO'
+                                  : 'FINALIZAR SERVICIO'}
+                              </span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => advanceJobStatus(job.id)}
+                              className="btn-advance-status"
+                              style={{ background: 'linear-gradient(135deg, var(--color-neon-emerald) 0%, #059669 100%)' }}
+                            >
+                              <CheckCircle2 size={12} />
+                              <span>ARCHIVAR TRABAJO COMPLETADO</span>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                {/* Chat de Coordinación con el Cliente (Pos-Pago) */}
+                {acceptedJobs.length > 0 && currentJobStatus !== 'completed' && (
+                  <section className="panel coordination-chat-panel">
+                    <h2 className="panel-title">Mensajes de Coordinación (Garantía EventGo Pay)</h2>
+                    <p className="panel-subtitle">Chateá con el cliente para ultimar los detalles del evento.</p>
+                    <CoordinationChat 
+                      role="provider"
+                      recipientName="Deyvid Oficial (Cliente)"
+                      recipientAvatar="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80"
+                      isDemoMode={apiService.getMode() === 'demo'}
+                    />
+                  </section>
+                )}
               </div>
             )}
-          </section>
+
+            {/* PESTAÑA B: CRUD de Mis Servicios */}
+            {providerTab === 'services' && (
+              <section className="panel">
+                <div className="flex-items justify-between" style={{ marginBottom: '16px' }}>
+                  <div>
+                    <h2 className="panel-title">Mis Servicios Ofrecidos</h2>
+                    <p className="panel-subtitle">Agregá, editá o eliminá los servicios que los clientes pueden contratar.</p>
+                  </div>
+                  <button 
+                    className="btn-start-simulation" 
+                    style={{ width: 'auto', padding: '10px 20px' }}
+                    onClick={() => {
+                      setEditingService(null);
+                      setShowAddServiceModal(true);
+                    }}
+                  >
+                    + Agregar Nuevo Servicio
+                  </button>
+                </div>
+
+                <div className="provider-services-crud-list">
+                  {providerServices.map((svc) => (
+                    <div key={svc.id} className="crud-service-row">
+                      <div className="crud-service-info">
+                        <div className="flex-items gap-sm">
+                          <span className="service-emoji">{getCategoryEmoji(svc.category)}</span>
+                          <h4>{svc.title}</h4>
+                          <span className="subcategory-pill">{svc.subCategory}</span>
+                        </div>
+                        <p>{svc.description}</p>
+                        <span className="price-tag">${svc.price.toLocaleString()} / hr</span>
+                      </div>
+                      <div className="crud-service-actions">
+                        <button 
+                          className="btn-edit-svc"
+                          onClick={() => {
+                            setEditingService(svc);
+                            setShowAddServiceModal(true);
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button 
+                          className="btn-delete-svc"
+                          onClick={() => handleDeleteService(svc.id)}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* PESTAÑA C: Galería Multimedia */}
+            {providerTab === 'gallery' && (
+              <section className="panel">
+                <h2 className="panel-title">Galería de Fotos & Trabajos Previos</h2>
+                <p className="panel-subtitle">Cargá fotos de tus eventos anteriores para atraer a más clientes.</p>
+
+                {/* Cargador y Selector de Archivos (Dispositivo & Google Drive) */}
+                <div className="media-selector-controls-box flex-items gap-md" style={{ marginBottom: '24px', marginTop: '16px' }}>
+                  
+                  {/* Carga desde Dispositivo */}
+                  <label className="btn-upload-local flex-items gap-xs">
+                    📁 Cargar desde Dispositivo
+                    <input 
+                      type="file" 
+                      accept="image/*,video/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const url = URL.createObjectURL(file);
+                          const name = file.name.split('.')[0];
+                          handleUploadMedia(url, name);
+                        }
+                      }}
+                    />
+                  </label>
+
+                  {/* Carga desde Google Drive */}
+                  <button 
+                    type="button"
+                    className="btn-upload-drive flex-items gap-xs"
+                    onClick={() => setShowDrivePicker(true)}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" className="drive-btn-logo">
+                      <path fill="#FFC107" d="M18.15 15.65H23L18.15 7.3H13.3L18.15 15.65z"/>
+                      <path fill="#2196F3" d="M9.85 15.65h13L18 7.3H4.85l5 8.35z" opacity=".2"/>
+                      <path fill="#4CAF50" d="M9.85 15.65H1.2L6 7.3h8.65l-4.8 8.35z"/>
+                      <path fill="#2196F3" d="M6 7.3L1.2 15.65l4.85 8.35h4.8l-4.85-8.35L14.65 7.3H6z"/>
+                    </svg>
+                    Buscar en Google Drive
+                  </button>
+
+                  <span className="or-text-label">o pegar URL:</span>
+
+                  {/* Carga por URL directa (Fallback) */}
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const fd = new FormData(e.currentTarget);
+                      const url = fd.get('url') as string;
+                      const title = fd.get('title') as string;
+                      handleUploadMedia(url, title);
+                      e.currentTarget.reset();
+                    }}
+                    className="flex-items gap-sm flex-grow"
+                    style={{ margin: 0, padding: 0 }}
+                  >
+                    <input 
+                      type="text" 
+                      name="title" 
+                      placeholder="Título de la foto" 
+                      className="login-api-url-input"
+                      style={{ flexGrow: 1 }}
+                      required
+                    />
+                    <input 
+                      type="text" 
+                      name="url" 
+                      placeholder="https://images.unsplash.com/..." 
+                      className="login-api-url-input"
+                      style={{ flexGrow: 1 }}
+                      required
+                    />
+                    <button type="submit" className="btn-start-simulation" style={{ width: 'auto', padding: '10px 24px' }}>
+                      Subir
+                    </button>
+                  </form>
+                </div>
+
+                <div className="profile-gallery-grid">
+                  {providerGallery.map((img) => (
+                    <div key={img.id} className="gallery-media-item">
+                      <img src={img.url} alt={img.title} className="gallery-media-img" />
+                      <div className="gallery-media-hover-overlay">
+                        <span>{img.title}</span>
+                        <button 
+                          type="button" 
+                          className="btn-delete-media-overlay"
+                          onClick={() => handleDeleteMedia(img.id)}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* PESTAÑA D: Reseñas recibidas */}
+            {providerTab === 'reviews' && (
+              <section className="panel">
+                <h2 className="panel-title">Historial de Reseñas de Clientes</h2>
+                <p className="panel-subtitle">Visualizá los comentarios y valoraciones recibidas de eventos pasados.</p>
+
+                <div className="profile-reviews-list flex-column gap-sm" style={{ marginTop: '16px' }}>
+                  {[
+                    { name: 'Deyvid Oficial', rating: 5, comment: 'Excelente dj. Trajo equipos de primera calidad, las luces y el humo fueron geniales.', date: 'Ayer' },
+                    { name: 'Ana Bertolini', rating: 4, comment: 'Muy profesional. Excelente selección de temas que mantuvo a todos activos.', date: 'Hace 3 días' }
+                  ].map((rev, i) => (
+                    <div key={i} className="review-comment-row-card">
+                      <div className="review-comment-header">
+                        <span className="review-comment-author">{rev.name}</span>
+                        <div className="review-comment-rating">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star 
+                              key={star} 
+                              size={12} 
+                              className={star <= rev.rating ? 'star-active-fill' : 'star-inactive-fill'} 
+                            />
+                          ))}
+                        </div>
+                        <span className="review-comment-date">{rev.date}</span>
+                      </div>
+                      <p className="review-comment-text">"{rev.comment}"</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+          </div>
         </main>
       )}
 

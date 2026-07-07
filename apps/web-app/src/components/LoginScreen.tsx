@@ -8,6 +8,7 @@ export interface SessionUser {
   role: 'client' | 'provider';
   appMode: 'demo' | 'real';
   apiUrl: string;
+  providerConfig?: any;
 }
 
 interface LoginScreenProps {
