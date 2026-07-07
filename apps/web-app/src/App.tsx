@@ -458,9 +458,24 @@ function App() {
 
   const submitReview = () => {
     if (!reviewingOrder) return;
-    setPastOrders((prev) =>
-      prev.map((o) => (o.id === reviewingOrder.id ? { ...o, reviewed: true } : o))
-    );
+    
+    setPastOrders((prev) => {
+      const exists = prev.some((o) => o.id === reviewingOrder.id);
+      if (exists) {
+        return prev.map((o) => (o.id === reviewingOrder.id ? { ...o, reviewed: true } : o));
+      } else {
+        const newOrder = {
+          id: reviewingOrder.id,
+          title: reviewingOrder.title,
+          date: 'Hoy — Calificado',
+          price: finalGrandTotal,
+          category: 'MUSIC',
+          reviewed: true,
+        };
+        return [newOrder, ...prev];
+      }
+    });
+
     setReviewingOrder(null);
     setReviewComment('');
     setRating(5);
@@ -866,7 +881,7 @@ function App() {
       )}
 
       {/* Modal de Calificación y Opinión (PedidosYa Style) */}
-      {reviewingOrder && (
+      {reviewingOrder && role === 'client' && (
         <div className="modal-backdrop">
           <div className="modal-card review-modal-card">
             <div className="modal-glow" />
