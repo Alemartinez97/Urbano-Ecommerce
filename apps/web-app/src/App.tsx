@@ -174,7 +174,27 @@ function App() {
   useEffect(() => {
     if (!session) return;
     apiService.getProviders(categoryFilter, subCategoryFilter)
-      .then(data => setCatalog(data))
+      .then(data => {
+        // Fusionar el catálogo base con los servicios publicados por proveedores reales
+        try {
+          const marketplace: Record<string, any[]> = JSON.parse(
+            localStorage.getItem('eventgo_marketplace') ?? '{}'
+          );
+          const publishedServices = Object.values(marketplace).flat();
+          // Filtrar por categoría/subcategoría si aplica
+          const filtered = publishedServices.filter(s => {
+            if (categoryFilter && s.category !== categoryFilter) return false;
+            if (subCategoryFilter && s.subCategory !== subCategoryFilter) return false;
+            return true;
+          });
+          // Fusionar evitando duplicados por id
+          const existingIds = new Set(data.map((d: any) => d.id));
+          const newOnes = filtered.filter(s => !existingIds.has(s.id));
+          setCatalog([...data, ...newOnes]);
+        } catch (e) {
+          setCatalog(data);
+        }
+      })
       .catch(err => console.error("Error al cargar el catálogo:", err));
   }, [session, categoryFilter, subCategoryFilter]);
 
@@ -240,31 +260,64 @@ function App() {
   const [pendingCartItem, setPendingCartItem] = useState<CartItem | null>(null);
   const [activeChatIndex, setActiveChatIndex] = useState(0);
 
-  // Servicios iniciales del Proveedor
-  const [providerServices, setProviderServices] = useState<any[]>([
-    {
-      id: 'ps-1',
-      title: 'Servicio de Mozo Premium',
-      category: 'STAFF',
-      subCategory: 'waiter',
-      price: 5500,
-      description: 'Atención personalizada para mesas principales, protocolo formal.',
-      availableExtras: [
-        { name: 'Vajilla fina incluida', price: 2000 }
-      ]
-    },
-    {
-      id: 'ps-2',
-      title: 'Sommelier para Recepción',
-      category: 'STAFF',
-      subCategory: 'barman',
-      price: 7000,
-      description: 'Asesoramiento y servicio de cata de vinos de alta gama para invitados.',
-      availableExtras: [
-        { name: 'Copas de cristal importadas', price: 3000 }
-      ]
-    }
-  ]);
+  // Servicios del Proveedor — persisten en localStorage por cuenta
+  const providerStorageKey = `eventgo_provider_services_${session?.email ?? 'guest'}`;
+  const [providerServices, setProviderServices] = useState<any[]>(() => {
+    try {
+      const stored = localStorage.getItem(providerStorageKey);
+      if (stored) return JSON.parse(stored);
+    } catch (e) { /* ignore */ }
+    return [
+      {
+        id: 'ps-1',
+        title: 'Servicio de Mozo Premium',
+        category: 'STAFF',
+        subCategory: 'waiter',
+        price: 5500,
+        description: 'Atención personalizada para mesas principales, protocolo formal.',
+        distanceKm: 1.2,
+        rating: 4.8,
+        avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=80&q=80',
+        availableExtras: [{ name: 'Vajilla fina incluida', price: 2000 }]
+      },
+      {
+        id: 'ps-2',
+        title: 'Sommelier para Recepción',
+        category: 'STAFF',
+        subCategory: 'barman',
+        price: 7000,
+        description: 'Asesoramiento y servicio de cata de vinos de alta gama para invitados.',
+        distanceKm: 2.1,
+        rating: 4.9,
+        avatar: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=80&q=80',
+        availableExtras: [{ name: 'Copas de cristal importadas', price: 3000 }]
+      }
+    ];
+  });
+
+  // Sincronizar providerServices con localStorage al cambiar
+  useEffect(() => {
+    try {
+      // Enriquecer con datos del proveedor antes de publicar
+      const enriched = providerServices.map(s => ({
+        ...s,
+        _providerEmail: session?.email,
+        _providerName: session?.name || session?.email,
+        distanceKm: s.distanceKm ?? (Math.random() * 4 + 0.5).toFixed(1),
+        rating: s.rating ?? 4.7,
+        avatar: s.avatar ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80',
+        availableExtras: s.availableExtras ?? []
+      }));
+      localStorage.setItem(providerStorageKey, JSON.stringify(enriched));
+
+      // Publicar en el marketplace global (visible para clientes)
+      const allPublished: Record<string, any[]> = JSON.parse(
+        localStorage.getItem('eventgo_marketplace') ?? '{}'
+      );
+      allPublished[session?.email ?? 'guest'] = enriched;
+      localStorage.setItem('eventgo_marketplace', JSON.stringify(allPublished));
+    } catch (e) { /* ignore */ }
+  }, [providerServices, session?.email]);
 
   // Galería de fotos/videos inicial del Proveedor (URLs reales atractivas de Unsplash)
   const [providerGallery, setProviderGallery] = useState<any[]>([
