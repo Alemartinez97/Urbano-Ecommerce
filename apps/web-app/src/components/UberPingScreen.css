@@ -283,3 +283,43 @@
 .uber-ping-btn-decline:hover {
   color: #f87171; /* red-400 */
 }
+
+/* ── Responsividad Móvil (Dispositivos Pequeños o Pantallas Cortas) ── */
+@media (max-height: 700px) {
+  .uber-ping-card {
+    padding: 16px;
+    border-radius: 24px;
+    max-width: 360px;
+  }
+  .uber-ping-header {
+    margin-bottom: 12px;
+  }
+  .uber-ping-title {
+    font-size: 18px;
+  }
+  .uber-ping-timer-container {
+    margin-bottom: 16px;
+  }
+  .uber-ping-timer-svg {
+    width: 90px;
+    height: 90px;
+  }
+  .uber-ping-timer-number {
+    font-size: 28px;
+  }
+  .uber-ping-grid {
+    margin-bottom: 16px;
+    padding: 10px;
+    gap: 8px;
+  }
+  .uber-ping-grid-value {
+    font-size: 13px;
+  }
+  .uber-ping-location-box {
+    margin-bottom: 16px;
+  }
+  .uber-ping-btn-accept {
+    padding: 12px;
+    font-size: 14px;
+  }
+}

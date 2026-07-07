@@ -112,4 +112,111 @@ export class UsersService {
 
     return await this.userRepository.save(user);
   }
+
+  // Conecta o desconecta a un proveedor y registra su localización actual en tiempo real
+  async toggleOnline(userId: string, isOnline: boolean, lat?: number, lon?: number): Promise<UserEntity> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['providerProfile'],
+    });
+
+    if (!user) {
+      throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
+    }
+
+    if (user.role !== 'PROVIDER' || !user.providerProfile) {
+      throw new ConflictException('El usuario no tiene un perfil de proveedor activo');
+    }
+
+    user.providerProfile.isOnline = isOnline;
+    if (isOnline) {
+      if (lat === undefined || lon === undefined) {
+        throw new ConflictException('Se requieren coordenadas de latitud y longitud para conectarse');
+      }
+      user.providerProfile.latitude = lat;
+      user.providerProfile.longitude = lon;
+    } else {
+      user.providerProfile.latitude = null;
+      user.providerProfile.longitude = null;
+    }
+
+    await this.providerProfileRepository.save(user.providerProfile);
+    return user;
+  }
+
+  // Cuenta la cantidad de proveedores activos de una categoría que están dentro de una geocerca
+  async getActiveProvidersCount(
+    category: string,
+    centerLat: number,
+    centerLon: number,
+    radiusKm: number,
+  ): Promise<number> {
+    const activeProviders = await this.providerProfileRepository.find({
+      where: { category, isOnline: true },
+    });
+
+    let count = 0;
+    for (const provider of activeProviders) {
+      if (provider.latitude !== null && provider.longitude !== null) {
+        const distance = this.calculateDistance(
+          centerLat,
+          centerLon,
+          provider.latitude,
+          provider.longitude,
+        );
+        if (distance <= radiusKm) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Radio de la tierra en km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  // Retorna la lista ordenada de proveedores activos geocercanos
+  async getActiveProvidersList(
+    category: string,
+    centerLat: number,
+    centerLon: number,
+    radiusKm: number,
+  ): Promise<{ userId: string; distanceKm: number }[]> {
+    const activeProviders = await this.providerProfileRepository.find({
+      where: { category, isOnline: true },
+      relations: ['user'], // Para obtener el userId
+    });
+
+    const list: { userId: string; distanceKm: number }[] = [];
+    for (const provider of activeProviders) {
+      if (provider.latitude !== null && provider.longitude !== null) {
+        const distance = this.calculateDistance(
+          centerLat,
+          centerLon,
+          provider.latitude,
+          provider.longitude,
+        );
+        if (distance <= radiusKm) {
+          list.push({
+            userId: provider.user?.id || 'unknown',
+            distanceKm: Math.round(distance * 100) / 100,
+          });
+        }
+      }
+    }
+
+    // Ordenar de más cercano a más lejano (Algoritmo de Matching)
+    return list.sort((a, b) => a.distanceKm - b.distanceKm);
+  }
 }

@@ -15,6 +15,9 @@ export class ProviderProfileEntity {
   @Column({ nullable: true })
   category: string;
 
+  @Column({ type: 'boolean', default: false })
+  isOnline: boolean;
+
   // Pilar 2: Geolocalización (Estilo Uber)
   @Column({ type: 'float', nullable: true })
   latitude: number;

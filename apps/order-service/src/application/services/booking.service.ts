@@ -36,10 +36,58 @@ export class BookingService {
       }
     } catch (error) {
       if (error instanceof ConflictException) throw error;
-      this.logger.warn('No se pudo verificar la disponibilidad, procediendo bajo riesgo', error.message);
+      this.logger.warn('No se pudo verificar la disponibilidad, procediendo bajo riesgo: ' + error.message);
     }
 
-    // 2. Crear la reserva
+    // 2. Validar tarifa dinámica en el servidor si se proveen coordenadas (Evita hackeos)
+    if (data.latitude !== undefined && data.longitude !== undefined) {
+      const catalogUrl = process.env.CATALOG_SERVICE_URL || 'http://localhost:3001';
+      const usersUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3002';
+      
+      try {
+        // Obtener datos del servicio del catálogo
+        const serviceRes = await firstValueFrom(
+          this.httpService.get(`${catalogUrl}/api/v1/services/${data.serviceId}`)
+        );
+        const basePrice = Number(serviceRes.data.basePrice);
+        const category = serviceRes.data.category;
+
+        // Obtener oferta
+        const providersRes = await firstValueFrom(
+          this.httpService.get(`${usersUrl}/api/v1/providers/active-count`, {
+            params: {
+              category,
+              latitude: data.latitude,
+              longitude: data.longitude,
+              radiusKm: 10,
+            },
+          })
+        );
+        const activeProvidersCount = providersRes.data.count ?? 0;
+
+        // Obtener demanda local
+        const demandCount = await this.getActiveBookingsCount(category, data.latitude, data.longitude, 10);
+
+        // Calcular multiplicador
+        let multiplier = 1.0;
+        if (demandCount > activeProvidersCount) {
+          const divisor = activeProvidersCount + 1;
+          const diff = demandCount - activeProvidersCount;
+          multiplier = 1.0 + (diff / divisor) * 0.15;
+        }
+
+        const expectedPrice = Math.round(basePrice * multiplier * 100) / 100;
+
+        if (Math.abs(data.totalAmount - expectedPrice) > 10.0) {
+          throw new ConflictException(`La tarifa enviada ($${data.totalAmount}) difiere de la tarifa dinámica oficial del servidor ($${expectedPrice})`);
+        }
+      } catch (err) {
+        if (err instanceof ConflictException) throw err;
+        this.logger.warn('Error al verificar tarifa dinámica en el servidor: ' + err.message);
+      }
+    }
+
+    // 3. Crear la reserva
     const booking = this.bookingRepository.create({
       customerId,
       providerId: data.providerId,
@@ -48,6 +96,8 @@ export class BookingService {
       endTime: new Date(data.endTime),
       totalAmount: data.totalAmount,
       location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
       specialInstructions: data.specialInstructions,
       status: BookingStatus.PENDING,
     });
@@ -69,6 +119,63 @@ export class BookingService {
       where: { providerId },
       order: { startTime: 'DESC' },
     });
+  }
+
+  // Cuenta las reservas activas (PENDING/CONFIRMED) dentro de un radio geográfico
+  async getActiveBookingsCount(
+    category: string,
+    centerLat: number,
+    centerLon: number,
+    radiusKm: number,
+  ): Promise<number> {
+    const activeBookings = await this.bookingRepository.find({
+      where: [
+        { status: BookingStatus.PENDING },
+        { status: BookingStatus.CONFIRMED },
+      ],
+    });
+
+    const catalogUrl = process.env.CATALOG_SERVICE_URL || 'http://localhost:3001';
+    let count = 0;
+
+    for (const booking of activeBookings) {
+      if (booking.latitude !== null && booking.longitude !== null && booking.latitude !== undefined && booking.longitude !== undefined) {
+        // Consultar la categoría del servicio asociado a la reserva
+        try {
+          const serviceRes = await firstValueFrom(
+            this.httpService.get(`${catalogUrl}/api/v1/services/${booking.serviceId}`)
+          );
+          if (serviceRes.data.category === category) {
+            const distance = this.calculateDistance(
+              centerLat,
+              centerLon,
+              booking.latitude,
+              booking.longitude,
+            );
+            if (distance <= radiusKm) {
+              count++;
+            }
+          }
+        } catch (err) {
+          this.logger.warn(`No se pudo verificar la categoría del servicio ${booking.serviceId} para la reserva ${booking.id}: ${err.message}`);
+        }
+      }
+    }
+    return count;
+  }
+
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Radio de la tierra en km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   }
 
   async confirmBooking(bookingId: string): Promise<BookingEntity> {

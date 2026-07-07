@@ -1,8 +1,9 @@
 import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Req, Logger } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsDate, IsDateString, IsOptional, IsString } from 'class-validator';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { AvailabilityService } from '../../application/services/inventory.service';
+import { Type } from 'class-transformer';
 
 // DTO para consultar disponibilidad rápida antes de mostrar un proveedor en el buscador
 class CheckAvailabilityDto {
@@ -10,9 +11,11 @@ class CheckAvailabilityDto {
   providerId: string;
 
   @IsDateString()
+  @Type(() => Date)
   startTime: string;
 
   @IsDateString()
+  @Type(() => Date)
   endTime: string;
 }
 
@@ -46,8 +49,8 @@ export class AvailabilityController {
   ) {
     const available = await this.availabilityService.isAvailable(
       providerId,
-      new Date(startTime),
-      new Date(endTime),
+      new Date(startTime), // Con @Type ya no sería necesario el new Date()
+      new Date(endTime),   // Se podría pasar el DTO directamente
     );
     return { providerId, available };
   }

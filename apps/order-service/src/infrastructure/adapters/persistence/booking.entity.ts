@@ -42,6 +42,12 @@ export class BookingEntity {
   @Column({ type: 'text', nullable: true })
   location: string;
 
+  @Column({ type: 'float', nullable: true })
+  latitude: number;
+
+  @Column({ type: 'float', nullable: true })
+  longitude: number;
+
   // Instrucciones adicionales del cliente para el proveedor
   @Column({ type: 'text', nullable: true })
   specialInstructions: string;

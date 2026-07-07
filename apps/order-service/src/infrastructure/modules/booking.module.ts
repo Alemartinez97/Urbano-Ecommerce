@@ -7,7 +7,9 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { BookingEntity } from '../adapters/persistence/booking.entity';
 import { BookingController } from '../controllers/booking.controller';
+import { OrdersController } from '../controllers/orders.controller';
 import { BookingService } from '../../application/services/booking.service';
+import { MatchmakerService } from '../../application/services/matchmaker.service';
 import { JwtStrategy } from '../strategies/jwt.strategy';
 
 @Module({
@@ -39,8 +41,8 @@ import { JwtStrategy } from '../strategies/jwt.strategy';
       },
     ]),
   ],
-  controllers: [BookingController],
-  providers: [BookingService, JwtStrategy],
-  exports: [BookingService],
+  controllers: [BookingController, OrdersController],
+  providers: [BookingService, MatchmakerService, JwtStrategy],
+  exports: [BookingService, MatchmakerService],
 })
 export class BookingModule {}

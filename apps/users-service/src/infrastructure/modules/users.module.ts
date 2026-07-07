@@ -8,6 +8,7 @@ import { ProviderProfileEntity } from '../persistence/provider-profile.entity';
 import { UsersService } from '../../application/services/users.service';
 import { BcryptEncryptionService } from '../../domain/services/bcrypt-encryption.service';
 import { UsersController } from '../controllers/users.controller';
+import { ProvidersController } from '../controllers/providers.controller';
 import { HealthController } from '../controllers/health.controller';
 import { JwtStrategy } from '../strategies/jwt.strategy';
 
@@ -24,7 +25,7 @@ import { JwtStrategy } from '../strategies/jwt.strategy';
       }),
     }),
   ],
-  controllers: [UsersController, HealthController],
+  controllers: [UsersController, ProvidersController, HealthController],
   providers: [
     UsersService,
     JwtStrategy,

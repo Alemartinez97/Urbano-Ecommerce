@@ -19,6 +19,7 @@
     "start:mobile": "cd expo-app && npx expo start --clear",
     "build:web": "npm run build -w web-app",
     "lint": "eslint \"{src,apps,test,e2e}/**/*.ts\" --fix",
+    "test": "jest --config jest.config.js",
     "test:e2e": "jest --config jest.e2e.config.js --runInBand",
     "infrastructure:up": "docker-compose up -d",
     "infrastructure:down": "docker-compose down"
@@ -52,6 +53,7 @@
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
+    "@nestjs/testing": "^10.4.22",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.0.0",
     "@types/passport-google-oauth20": "^2.0.17",

@@ -25,7 +25,7 @@ export class ProductController {
   @ApiQuery({ name: 'maxPrice', type: Number, required: false })
   @ApiQuery({ name: 'sortByPrice', enum: ['asc', 'desc'], required: false })
   @ApiQuery({ name: 'tags', type: String, required: false, description: 'Palabras clave para la búsqueda IA (ej: asado, dj, mozo)' })
-  async search(@Query() params: SearchEventServicesDto): Promise<EventServiceEntity[]> {
+  async search(@Query() params: SearchEventServicesDto): Promise<any[]> {
     return await this.productService.search(params);
   }
 

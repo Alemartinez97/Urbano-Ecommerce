@@ -85,4 +85,19 @@ export class SearchEventServicesDto {
   @IsOptional()
   @IsString()
   tags?: string;
+
+  @ApiProperty({ description: 'Latitud del evento para tarifas dinámicas y geocercas', required: false })
+  @IsOptional()
+  @IsNumber()
+  latitude?: number;
+
+  @ApiProperty({ description: 'Longitud del evento para tarifas dinámicas y geocercas', required: false })
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
+
+  @ApiProperty({ description: 'Radio de búsqueda en km', required: false, default: 10 })
+  @IsOptional()
+  @IsNumber()
+  radiusKm?: number;
 }

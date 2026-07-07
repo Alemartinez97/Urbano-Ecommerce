@@ -4,9 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
-import { EventServiceEntity, ServiceCategory, PricingType } from '../../infrastructure/persistence/product.entity';
+import { Repository } from 'typeorm';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
+import { EventServiceEntity } from '../../infrastructure/persistence/product.entity';
 import { CreateEventServiceDto, UpdateEventServiceDto, SearchEventServicesDto } from '../dtos/product.dto';
+import { PricingService } from './pricing.service';
+import { LocationService } from './location.service';
 
 @Injectable()
 export class ProductService {
@@ -15,6 +19,9 @@ export class ProductService {
   constructor(
     @InjectRepository(EventServiceEntity)
     private readonly serviceRepository: Repository<EventServiceEntity>,
+    private readonly pricingService: PricingService,
+    private readonly locationService: LocationService,
+    private readonly httpService: HttpService,
   ) {}
 
   // Devuelve todos los servicios activos del marketplace (listado principal del E-commerce)
@@ -36,7 +43,9 @@ export class ProductService {
 
   // Buscador estilo E-commerce: filtra por categoría, precio máximo y ordena según lo requerido
   // Es la base sobre la que se construirá el algoritmo de matching e IA
-  async search(params: SearchEventServicesDto): Promise<EventServiceEntity[]> {
+  async search(
+    params: SearchEventServicesDto,
+  ): Promise<(EventServiceEntity & { dynamicPrice: number; priceMultiplier: number })[]> {
     const query = this.serviceRepository.createQueryBuilder('service');
     query.where('service.active = true');
 
@@ -65,7 +74,68 @@ export class ProductService {
       query.orderBy('service.rating', 'DESC');
     }
 
-    return query.getMany();
+    const services = await query.getMany();
+
+    // Si no se especifican coordenadas de latitud/longitud, no hay cálculo dinámico (recargo 1.0)
+    if (params.latitude === undefined || params.longitude === undefined) {
+      return services.map((service) => ({
+        ...service,
+        dynamicPrice: Number(service.basePrice),
+        priceMultiplier: 1.0,
+      }));
+    }
+
+    // Valores para consultar la API de oferta/demanda
+    const usersUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3002';
+    const orderUrl = process.env.ORDER_SERVICE_URL || 'http://localhost:3005';
+    const radius = params.radiusKm || 10;
+
+    let activeProvidersCount = 0;
+    let demandCount = 0;
+
+    try {
+      // 1. Consultar proveedores activos en la zona (Oferta)
+      const providersRes = await firstValueFrom(
+        this.httpService.get(`${usersUrl}/api/v1/providers/active-count`, {
+          params: {
+            category: params.category,
+            latitude: params.latitude,
+            longitude: params.longitude,
+            radiusKm: radius,
+          },
+        }),
+      );
+      activeProvidersCount = providersRes.data.count ?? 0;
+
+      // 2. Consultar pedidos activos en la zona (Demanda)
+      const ordersRes = await firstValueFrom(
+        this.httpService.get(`${orderUrl}/api/v1/orders/active-count`, {
+          params: {
+            category: params.category,
+            latitude: params.latitude,
+            longitude: params.longitude,
+            radiusKm: radius,
+          },
+        }),
+      );
+      demandCount = ordersRes.data.count ?? 0;
+    } catch (err) {
+      this.logger.warn('Error al consultar oferta/demanda de tarifas dinámicas, usando base 1.0: ' + err.message);
+    }
+
+    // Calcular el precio dinámico de cada servicio
+    return services.map((service) => {
+      const { finalPrice, multiplier } = this.pricingService.calculatePrice(
+        Number(service.basePrice),
+        demandCount,
+        activeProvidersCount,
+      );
+      return {
+        ...service,
+        dynamicPrice: finalPrice,
+        priceMultiplier: multiplier,
+      };
+    });
   }
 
   // Crea un nuevo servicio (lo llama el proveedor desde su panel de gestión)

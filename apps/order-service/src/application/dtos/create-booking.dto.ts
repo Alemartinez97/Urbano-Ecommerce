@@ -34,4 +34,14 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   specialInstructions?: string;
+
+  @ApiProperty({ description: 'Latitud del evento', required: false })
+  @IsOptional()
+  @IsNumber()
+  latitude?: number;
+
+  @ApiProperty({ description: 'Longitud del evento', required: false })
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
 }
